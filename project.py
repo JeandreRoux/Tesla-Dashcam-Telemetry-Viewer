@@ -1,11 +1,10 @@
 import cv2 as cv
 import numpy as np
-import csv
 from PIL import Image, ImageFont, ImageDraw
 import re
 import sys
 from pathlib import Path
-# import pandas as pd
+import pandas as pd
 
 
 OVERLAY_BG_COLOR = (0, 0, 0, 200)
@@ -82,23 +81,17 @@ def main():
             
         if tesla_cam[timestamp]["data"]:
             data_filepath = f"{input_path}/{tesla_cam[timestamp]['data']}"
-            telemetry_data = read_csv(data_filepath)
-            # try:
-            #     telemetry_df = pd.read_csv(data_filepath)
-            #     print(f"Successfully loaded telemetry data from: {data_filepath}")
-            # except Exception as e:
-            #     print(f"Error loading telemetry data from {data_filepath}: {e}")
-            #     telemetry_df = None
+            try:
+                telemetry_df = pd.read_csv(data_filepath)
+                print(f"Successfully loaded telemetry data from: {data_filepath}")
+            except Exception as e:
+                print(f"Error loading telemetry data from {data_filepath}: {e}")
+                telemetry_df = None
         else:
             print(f"No telemetry data file found for timestamp: {timestamp}")
         break
-        
-        
-    # sys.exit()
-        
     
-    # cap_front = cv.VideoCapture("sample/2026-01-21_17-52-27-front.mp4")
-    # cap_back = cv.VideoCapture("sample/2026-01-21_17-52-27-back.mp4")
+        ## Release capture of all clips: if cap_front: cap_front.release()
     
     canvas_width = CANVAS_WIDTH
     canvas_height = CANVAS_HEIGHT
@@ -110,6 +103,9 @@ def main():
     
     if not cap_front.isOpened() or not cap_back.isOpened():
         print("Cannot open file")
+        
+    frame_index = 0
+    
     while True:
         ret1, frame1 = cap_front.read()
         ret2, frame2 = cap_back.read()
@@ -132,7 +128,9 @@ def main():
         canvas[546:720, 524:756] = frame2_resized
         
         # Write text overlay
-        canvas = draw_overlay(canvas, curr_frame, telemetry_data)
+        canvas = draw_overlay(canvas, curr_frame, telemetry_df, frame_index)
+        
+        frame_index += 1
         
         cv.imshow("Rendering Preview", canvas) # Shows the video in a window
         if cv.waitKey(1) & 0xFF == ord('q'):    # Lets you quit by pressing 'q'
@@ -147,7 +145,7 @@ def main():
     cv.destroyAllWindows()
     
     
-def draw_overlay(canvas, f:int, telemetry_data:list):
+def draw_overlay(canvas, f:int, telemetry_df, frame_index):
     # 1. Background
     x, y, w, h = 552, 22, 175, 70
     
@@ -199,8 +197,11 @@ def draw_overlay(canvas, f:int, telemetry_data:list):
     roi_pil = Image.alpha_composite(roi_pil, overlay).convert("RGB")
     draw = ImageDraw.Draw(roi_pil)
     
+    # Read current frame data
+    current_frame_data = telemetry_df.iloc[frame_index]
+    
     # 2. Speed
-    speed, speed_unit = get_speed(f, telemetry_data)
+    speed, speed_unit = get_speed(f, current_frame_data)
     speed_x = get_text_x(speed, FONT_SPEED, draw, rec_center_x)
     speed_y = rec_center_y - 32
     
@@ -215,7 +216,7 @@ def draw_overlay(canvas, f:int, telemetry_data:list):
     draw.text((speed_unit_x, speed_unit_y), speed_unit, font=FONT_SPEED_UNIT, fill=FONT_WHITE)
     
     # 3. Autopilot State
-    autopilot_state = get_autopilot_state(f, telemetry_data)
+    autopilot_state = get_autopilot_state(f, current_frame_data)
     autopilot_state_x = get_text_x(autopilot_state, FONT_AUTOPILOT, draw, rec_center_x)
     autopilot_state_y = rec_center_y + 17
     
@@ -223,7 +224,7 @@ def draw_overlay(canvas, f:int, telemetry_data:list):
     draw.text((autopilot_state_x, autopilot_state_y), autopilot_state, font=FONT_AUTOPILOT, fill=FONT_BLUE)
     
     # 4. Gear State
-    gear_state = get_gear_state(f, telemetry_data)
+    gear_state = get_gear_state(f, current_frame_data)
     gear_state_x = get_text_x(gear_state, FONT_GEAR, draw, 20) + 1
     gear_state_y = get_text_y(gear_state, FONT_GEAR, draw, 20) + 1
     
@@ -253,8 +254,8 @@ def get_text_y(text, font, draw, shape_center):
     return shape_center - (text_height // 2) - bbox[1]
 
 
-def get_gear_state(f, telemetry_data) -> str:
-    match telemetry_data[f]["gear_state"]:
+def get_gear_state(f, current_frame_data) -> str:
+    match current_frame_data["gear_state"]:
         case "GEAR_PARK":
             return "P"
         case "GEAR_DRIVE":
@@ -267,8 +268,8 @@ def get_gear_state(f, telemetry_data) -> str:
             return ""
     
     
-def get_autopilot_state(f, telemetry_data) -> str:
-    match telemetry_data[f]["autopilot_state"]:
+def get_autopilot_state(f, current_frame_data) -> str:
+    match current_frame_data["autopilot_state"]:
         case "TACC":
             return "Cruise Control"
         case "AUTOSTEER":
@@ -279,36 +280,12 @@ def get_autopilot_state(f, telemetry_data) -> str:
             return ""
     
 
-def get_speed(f, telemetry_data) -> int:
-    speed_mps = float(telemetry_data[f]["vehicle_speed_mps"])
+def get_speed(f, current_frame_data) -> int:
+    speed_mps = float(current_frame_data['vehicle_speed_mps'])
     speed_kph = speed_mps * 3.6
     speed_unit = "km/h"
     
     return f"{speed_kph:.0f}", speed_unit
-
-    
-def read_csv(data):
-    telemetry_data = []
-    with open(data) as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            telemetry_data.append({
-                "gear_state": row["gear_state"],
-                "frame_seq_no": row["frame_seq_no"],
-                "vehicle_speed_mps": row["vehicle_speed_mps"],
-                "accelerator_pedal_position": row["accelerator_pedal_position"],
-                "steering_wheel_angle": row["steering_wheel_angle"],
-                "blinker_on_left": row["blinker_on_left"],
-                "blinker_on_right": row["blinker_on_right"],
-                "brake_applied": row["brake_applied"],
-                "autopilot_state": row["autopilot_state"],
-                "latitude_deg": row["latitude_deg"],
-                "longitude_deg": row["longitude_deg"],
-                "heading_deg": row["heading_deg"],
-                "linear_acceleration_mps2_x": row["linear_acceleration_mps2_x"],
-                "linear_acceleration_mps2_y": row["linear_acceleration_mps2_y"],
-                "linear_acceleration_mps2_z": row["linear_acceleration_mps2_z"]})
-    return telemetry_data
     
     
 if __name__ == "__main__":

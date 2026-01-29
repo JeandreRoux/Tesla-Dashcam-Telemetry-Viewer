@@ -3,3 +3,4 @@ pillow
 numpy
 protobuf
 python-ffmpeg
+pandas
