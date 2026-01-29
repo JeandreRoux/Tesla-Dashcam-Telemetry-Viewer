@@ -106,7 +106,7 @@ def main():
     
     # Codec and VideoWriter
     fourcc = cv.VideoWriter_fourcc(*'mp4v')
-    out = cv.VideoWriter('output.mp4', fourcc, fps, (canvas_width, canvas_height), isColor=True)
+    out = cv.VideoWriter('/output/output.mp4', fourcc, fps, (canvas_width, canvas_height), isColor=True)
     
     if not cap_front.isOpened() or not cap_back.isOpened():
         print("Cannot open file")
