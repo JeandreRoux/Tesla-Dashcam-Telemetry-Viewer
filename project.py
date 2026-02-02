@@ -52,7 +52,7 @@ def main():
     cap_temp.release()
     
     # Define output file codec and create the VideoWriter object
-    output_filepath = "./output/output.mp4"
+    output_filepath = f"./output/TeslaCam_{first_timestamp}.mp4"
     fourcc = cv.VideoWriter_fourcc(*'mp4v')
     out = cv.VideoWriter(output_filepath, fourcc, fps, (canvas_width, canvas_height), isColor=True)
         
@@ -95,6 +95,8 @@ def main():
         # Release the input video captures for this timestamp
         if cap_front: cap_front.release()
         if cap_back: cap_back.release()
+        if cap_left_repeater: cap_left_repeater.release()
+        if cap_right_repeater: cap_right_repeater.release()
     
     
     print(f"Finished all clips. Releasing final video file: {output_filepath}")
@@ -114,9 +116,11 @@ def process_video(cap_front, cap_back, cap_left_repeater, cap_right_repeater, te
     frame_index = 0
     
     while True:
-        ret1, frame1 = cap_front.read()
-        ret2, frame2 = cap_back.read()
-        if not ret1 or not ret2:
+        ret_front, frame_front = cap_front.read()
+        ret_back, frame_back = cap_back.read()
+        ret_left_repeater, frame_left_repeater = cap_left_repeater.read()
+        ret_right_repeater, frame_right_repeater = cap_right_repeater.read()
+        if not ret_front or not ret_back or not ret_left_repeater or not ret_right_repeater:
             print("Can't receive frame (stream end?). Exiting ...")
             break
         
@@ -127,12 +131,16 @@ def process_video(cap_front, cap_back, cap_left_repeater, cap_right_repeater, te
         canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
         
         # Resize videos
-        frame1_resized = cv.resize(frame1, (728, 546), interpolation=cv.INTER_LANCZOS4)
-        frame2_resized = cv.resize(frame2, (232, 174), interpolation=cv.INTER_LANCZOS4)
+        frame_front_resized = cv.resize(frame_front, (728, 546), interpolation=cv.INTER_LANCZOS4)
+        frame_back_resized = cv.resize(frame_back, (232, 174), interpolation=cv.INTER_LANCZOS4)
+        frame_left_repeater_resized = cv.resize(frame_left_repeater, (232, 174), interpolation=cv.INTER_LANCZOS4)
+        frame_right_repeater_resized = cv.resize(frame_right_repeater, (232, 174), interpolation=cv.INTER_LANCZOS4)
         
         # Position videos
-        canvas[0:546, 276:1004] = frame1_resized
-        canvas[546:720, 524:756] = frame2_resized
+        canvas[0:546, 276:1004] = frame_front_resized
+        canvas[546:720, 524:756] = frame_back_resized
+        canvas[546:720, 276:508] = frame_left_repeater_resized
+        canvas[546:720, 772:1004] = frame_right_repeater_resized
         
         # Write text overlay
         canvas = draw_overlay(canvas, curr_frame, telemetry_df, frame_index)
@@ -141,8 +149,10 @@ def process_video(cap_front, cap_back, cap_left_repeater, cap_right_repeater, te
         
         cv.imshow("Rendering Preview", canvas) # Shows the video in a window
         if cv.waitKey(1) & 0xFF == ord('q'):    # Lets you quit by pressing 'q'
-            cap_front.release()
-            cap_back.release()
+            if cap_front: cap_front.release()
+            if cap_back: cap_back.release()
+            if cap_left_repeater: cap_left_repeater.release()
+            if cap_right_repeater: cap_right_repeater.release()
             out.release()
             cv.destroyAllWindows()
             sys.exit("User stopped program.")
@@ -243,7 +253,7 @@ def draw_overlay(canvas, f:int, telemetry_df, frame_index):
     
     # Speed Unit
     speed_unit_x = get_text_x(speed_unit, FONT_SPEED_UNIT, draw, rec_center_x)
-    speed_unit_y = rec_center_y + 2
+    speed_unit_y = rec_center_y + 1
     
     # Draw Speed Unit
     draw.text((speed_unit_x, speed_unit_y), speed_unit, font=FONT_SPEED_UNIT, fill=FONT_WHITE)
@@ -262,7 +272,7 @@ def draw_overlay(canvas, f:int, telemetry_df, frame_index):
     gear_state_y = get_text_y(gear_state, FONT_GEAR, draw, 20) + 1
     
     # Draw Gear State
-    draw.text((gear_state_x, gear_state_y), gear_state, font=FONT_GEAR, fill=FONT_BLUE)
+    draw.text((gear_state_x, gear_state_y), gear_state, font=FONT_GEAR, fill=FONT_WHITE)
     
     
     # CONVERT BACK
@@ -304,7 +314,7 @@ def get_gear_state(f, current_frame_data) -> str:
 def get_autopilot_state(f, current_frame_data) -> str:
     match current_frame_data["autopilot_state"]:
         case "TACC":
-            return "Cruise Control"
+            return "Cruise"
         case "AUTOSTEER":
             return "Autopilot"
         case "SELF_DRIVING":
