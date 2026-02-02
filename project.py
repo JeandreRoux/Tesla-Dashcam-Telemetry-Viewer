@@ -11,7 +11,7 @@ OVERLAY_BG_COLOR = (0, 0, 0, 200)
 CIRCLE_BG_COLOR = (53, 53, 53, 220)
 FONT_WHITE = (255, 255, 255)
 FONT_BLUE = (19, 121, 227)
-FONT_SPEED = ImageFont.truetype("arial.ttf", 30)
+FONT_SPEED = ImageFont.truetype("arial.ttf", 32)
 FONT_SPEED_UNIT = ImageFont.truetype("arialbd.ttf", 14)
 FONT_AUTOPILOT = ImageFont.truetype("arialbd.ttf", 14)
 FONT_GEAR = ImageFont.truetype("arialbd.ttf", 16)
@@ -180,7 +180,6 @@ def process_video(cap_front, cap_back, cap_left_repeater, cap_right_repeater, te
 def compile_tesla_cam(input_path):
     pattern = re.compile(r"([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})-([a-z_]+)\.(mp4|csv)")
     
-    ## Create Dict for files -> Move to function
     tesla_cam = {}
     
     for item in input_path.iterdir():
@@ -277,7 +276,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
             right_blinker_fill = BLINKER_ON
             blinker_state["right"]["frame"] = int(f)
     
-    # Left Blinker        
+    # Left Blinker
     if left_blinker != blinker_state["left"]["state"]:
         blinker_state["left"]["state"] = left_blinker
         blinker_state["left"]["frame"] = int(f)
@@ -291,10 +290,16 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
             left_blinker_fill = BLINKER_ON
             blinker_state["left"]["frame"] = int(f)
     
-    
+    # Draw blinkers
     draw_left_blinker(left_blinker_fill, draw)
     draw_right_blinker(right_blinker_fill, draw)
     
+    # Draw accelerator
+    accelerator_pedal_position = get_accelerator_pedal_position(f, current_frame_data)
+    # phi = calculate_phi()
+    
+    draw.chord((145, 40, 165, 60), start=0, end=180, fill=(170, 170, 170, 250))
+        
     # Merge layers
     roi_pil = Image.alpha_composite(roi_pil, overlay).convert("RGB")
     draw = ImageDraw.Draw(roi_pil)
@@ -302,7 +307,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
     # 2. Speed
     speed, speed_unit = get_speed(f, current_frame_data)
     speed_x = get_text_x(speed, FONT_SPEED, draw, rec_center_x)
-    speed_y = rec_center_y - 32
+    speed_y = rec_center_y - 33
     
     # Draw Speed
     draw.text((speed_x, speed_y), speed, font=FONT_SPEED, fill=FONT_WHITE)
@@ -336,6 +341,10 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
     canvas[y:y+h, x:x+w] = final_roi
     
     return canvas
+
+
+def get_accelerator_pedal_position(f, current_frame_data):
+    accelerator_pedal_position = current_frame_data["accelerator_pedal_position"]
 
 
 def draw_left_blinker(blinker_fill, draw):
