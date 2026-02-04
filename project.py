@@ -5,10 +5,11 @@ import re
 import sys
 from pathlib import Path
 import pandas as pd
+import math
 
 
-OVERLAY_BG_COLOR = (0, 0, 0, 200)
-CIRCLE_BG_COLOR = (53, 53, 53, 220)
+OVERLAY_BG_COLOR = (0, 0, 0, 220)
+CIRCLE_BG_COLOR = (50, 50, 50, 245)
 FONT_WHITE = (255, 255, 255)
 FONT_BLUE = (19, 121, 227)
 FONT_SPEED = ImageFont.truetype("arial.ttf", 32)
@@ -17,6 +18,9 @@ FONT_AUTOPILOT = ImageFont.truetype("arialbd.ttf", 14)
 FONT_GEAR = ImageFont.truetype("arialbd.ttf", 16)
 BLINKER_OFF = (0, 102, 41, 220)
 BLINKER_ON = (0, 194, 78, 250)
+PEDAL_ACTIVE = (255, 255, 255, 250)
+PEDAL_INACTIVE = (140, 140, 140, 250)
+PEDAL_ACTIVE_CIRCLE = (170, 170, 170, 250)
 BLINKER_INTERVAL = 22
 CANVAS_WIDTH = 1280
 CANVAS_HEIGHT = 720
@@ -294,11 +298,18 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
     draw_left_blinker(left_blinker_fill, draw)
     draw_right_blinker(right_blinker_fill, draw)
     
-    # Draw accelerator
-    accelerator_pedal_position = get_accelerator_pedal_position(f, current_frame_data)
-    # phi = calculate_phi()
+    # Draw accelerator pedal
+    accelerator_pedal = draw_accelerator_pedal(f, current_frame_data)
+    overlay.paste(accelerator_pedal, (145, 40), mask=accelerator_pedal)
     
-    draw.chord((145, 40, 165, 60), start=0, end=180, fill=(170, 170, 170, 250))
+    # Draw brake pedal
+    
+    brake_pedal = draw_brake_pedal(f, current_frame_data)
+    overlay.paste(brake_pedal, (10, 40), mask=brake_pedal)
+        
+    # Steering Wheel
+    steering_wheel = draw_steering_wheel(f, current_frame_data)
+    overlay.paste(steering_wheel, (148, 13), mask=steering_wheel)
         
     # Merge layers
     roi_pil = Image.alpha_composite(roi_pil, overlay).convert("RGB")
@@ -343,8 +354,158 @@ def draw_overlay(canvas, f, telemetry_df, frame_index):
     return canvas
 
 
-def get_accelerator_pedal_position(f, current_frame_data):
+def draw_accelerator_pedal(f, current_frame_data, width=300, height=300):
     accelerator_pedal_position = current_frame_data["accelerator_pedal_position"]
+    
+    if accelerator_pedal_position > 0:
+        color = PEDAL_ACTIVE
+    else:
+        color = PEDAL_INACTIVE
+    
+    acc_start_angle, acc_end_angle = calculate_fill_angles(accelerator_pedal_position)
+    
+    # Create canvas
+    img = Image.new("RGBA", (width , height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    pedal_width = 100
+    pedal_height = 225
+    
+    pedal_x = ((width // 2) - (pedal_width // 2))
+    pedal_y = ((height // 2) - (pedal_height // 2))
+    
+    # Draw accelerator position
+    draw.chord((0, 0, 300, 300), start=acc_start_angle, end=acc_end_angle, fill=PEDAL_ACTIVE_CIRCLE)
+    
+    # Draw the main pedal body
+    shape = [pedal_x, pedal_y, pedal_x + pedal_width, pedal_y + pedal_height]
+    draw.rounded_rectangle(shape, radius=12, fill=color)
+    
+    num_lines = 4
+    for i in range(1, num_lines + 1):
+        y = (pedal_height // (num_lines + 1)) * i + 35
+        draw.line([pedal_x + 15, y, pedal_x + pedal_width - 15, y], fill="black", width=10)
+        
+    img = img.resize((20, 20), Image.LANCZOS)
+        
+    return img
+
+
+def draw_brake_pedal(f, current_frame_data, width=300, height=300):
+    brake_pedal_state = current_frame_data["brake_applied"]
+    
+    if brake_pedal_state:
+        color = PEDAL_ACTIVE
+    else:
+        color = PEDAL_INACTIVE
+    
+    # Create canvas
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    pedal_width = 190
+    pedal_height = 130
+    
+    pedal_x = ((width // 2) - (pedal_width // 2))
+    pedal_y = ((height // 2) - (pedal_height // 2))
+    
+    if brake_pedal_state:
+        draw.ellipse(
+            (0, 0, 300, 300),
+            fill=PEDAL_ACTIVE_CIRCLE
+        )
+    
+    # Draw the main pedal body
+    shape = [pedal_x, pedal_y, pedal_x + pedal_width, pedal_y + pedal_height]
+    draw.rounded_rectangle(shape, radius=10, fill=color)
+    
+    # Add "grip" lines
+    for i in range(1, 4):
+        x = (pedal_width // 4) * i + 55
+        draw.line([x, pedal_y + 15, x, pedal_y + pedal_height - 15], fill="black", width=10)
+        
+    img = img.resize((20, 20), Image.LANCZOS)
+        
+    return img
+
+
+def draw_steering_wheel(f, current_frame_data, size=200):
+    steering_angle = int(current_frame_data["steering_wheel_angle"])
+    
+    match current_frame_data["autopilot_state"]:
+        case "AUTOSTEER":
+            color = FONT_BLUE
+        case "SELF_DRIVING":
+            color = FONT_BLUE
+        case _:
+            color = FONT_WHITE
+    
+    # Create a new transparent canvas
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    # Define dimentions based on size
+    center = size // 2
+    rim_thickness = size // 10
+    hub_size = size // 4
+    
+    # 1. Draw outer rim
+    draw.ellipse([0, 0, size, size], outline=color, width=rim_thickness)
+    
+    # 2. Draw the horizontal spoke
+    # (Left, Top, Right, Bottom)
+    spoke_height = rim_thickness
+    draw.rectangle([
+        rim_thickness,
+        center - spoke_height // 2,
+        size - rim_thickness,
+        center + spoke_height // 2
+    ], fill=color)
+    
+    # 3. Draw vertical spoke
+    draw.rectangle(
+        [center - 15,
+         center,
+         center + 15,
+         size - rim_thickness
+    ], fill=color)
+    
+    # 4. Draw center hub
+    draw.ellipse([
+        center - hub_size // 2,
+        center - hub_size // 2,
+        center + hub_size // 2,
+        center + hub_size // 2
+    ], fill=color)
+    
+    img = img.rotate(-steering_angle, resample=Image.BICUBIC)
+    
+    img = img.resize((15, 15), Image.LANCZOS)
+    
+    return img
+
+
+def calculate_fill_angles(accelerator_pedal_position):
+    """
+    Calculates start and end angles for a bottom-top fill of the accelerator circle
+    percent: 0.0 to 1.0
+    """
+    fill_pct = int(accelerator_pedal_position) / 100
+    
+    # Calculate the vertical distance from the center (radius = 1)
+    # Height goes from 0 to 2, so center is at 1
+    height = fill_pct * 2
+    distance_from_center = 1 - height
+    
+    # Calculate angle from vertical center line in radians
+    phi = math.acos(distance_from_center)
+    
+    # Convert to degrees
+    phi_deg = int(math.degrees(phi))
+    
+    
+    # In Pillow, 90 is the bottom. So +/- phi_deg from 90
+    return 90 - phi_deg, 90 + phi_deg
 
 
 def draw_left_blinker(blinker_fill, draw):
