@@ -34,7 +34,7 @@ blinker_state = {
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="TeslaCam Telemetry Viewer",
+        prog="Tesla Dashcam Telemetry Viewer",
         description="Processes Tesla dashcam footage and telemetry data to create a multi-camera overlay video with real-time vehicle telemetry information including speed, autopilot state, steering angle, and pedal positions.",
         allow_abbrev=False,
     )
@@ -49,6 +49,11 @@ def main():
     )
     parser.add_argument(
         "--mph", help="sets speed units to MPH (default is KM/H)", action="store_true"
+    )
+    parser.add_argument(
+        "--preview",
+        help="enabled render preview while videos are being processed",
+        action="store_true",
     )
 
     args = parser.parse_args()
@@ -127,6 +132,12 @@ def main():
                 telemetry_df = None
         else:
             print(f"No telemetry data file found for timestamp: {timestamp}")
+            
+        if args.preview:
+            print("Loading preview... press 'q' to quit.")
+            print("Processing videos...")
+        else:
+            print("Processing videos...")
 
         process_video(
             cap_front=cap_front,
@@ -148,6 +159,7 @@ def main():
         if cap_right_repeater:
             cap_right_repeater.release()
 
+    
     print(f"Finished all clips. Releasing final video file: {output_filepath}")
     out.release()
     cv.destroyAllWindows()
@@ -177,7 +189,6 @@ def process_video(
             or not ret_left_repeater
             or not ret_right_repeater
         ):
-            print("Can't receive frame (stream end?). Exiting ...")
             break
 
         # Get current frame index
@@ -211,20 +222,21 @@ def process_video(
             canvas = draw_overlay(canvas, curr_frame, telemetry_df, frame_index, args)
 
         frame_index += 1
-
-        cv.imshow("Rendering Preview", canvas)  # Shows the video in a window
-        if cv.waitKey(1) & 0xFF == ord("q"):  # Lets you quit by pressing 'q'
-            if cap_front:
-                cap_front.release()
-            if cap_back:
-                cap_back.release()
-            if cap_left_repeater:
-                cap_left_repeater.release()
-            if cap_right_repeater:
-                cap_right_repeater.release()
-            out.release()
-            cv.destroyAllWindows()
-            sys.exit("User stopped program.")
+        
+        if args.preview:
+            cv.imshow("Preview", canvas)  # Shows the video in a window
+            if cv.waitKey(1) & 0xFF == ord("q"):  # Lets you quit by pressing 'q'
+                if cap_front:
+                    cap_front.release()
+                if cap_back:
+                    cap_back.release()
+                if cap_left_repeater:
+                    cap_left_repeater.release()
+                if cap_right_repeater:
+                    cap_right_repeater.release()
+                out.release()
+                cv.destroyAllWindows()
+                sys.exit("User stopped program.")
 
         # write frame
         out.write(canvas)
