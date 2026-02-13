@@ -86,17 +86,7 @@ def main():
             print("Error: The following timestamps are missing a data file:")
             for ts in missing_data_timestamps:
                 print(f"- {ts}")
-            while True:
-                response = input(
-                    "Would you like to continue without the telemetry overlay? 'y' or 'n': "
-                ).strip()
-                if response == "n":
-                    sys.exit("Processing aborted due to missing data files.")
-                elif response == "y":
-                    args.no_overlay = True
-                    break
-                else:
-                    print("Expected response 'y' or 'n'. Please try again.")
+            args.no_overlay = telemetry_user_input()
 
     # --- Initialize the VideoWriter ---
     # Get video properties
@@ -115,6 +105,7 @@ def main():
     canvas_width = CANVAS_WIDTH
     canvas_height = CANVAS_HEIGHT
     fps = cap_temp.get(cv.CAP_PROP_FPS)
+    total_frames = int(cap_temp.get(cv.CAP_PROP_FRAME_COUNT))
     cap_temp.release()
 
     # Define output file codec and create the VideoWriter object
@@ -148,10 +139,17 @@ def main():
             data_filepath = f"{input_path}/{tesla_cam[timestamp]['data']}"
             try:
                 telemetry_df = pd.read_csv(data_filepath)
-                print(f"Successfully loaded telemetry data from: {data_filepath}")
+                if len(telemetry_df) != total_frames:
+                    print(f"Partial telemetry data found in: {data_filepath}")
+                    print("This can be caused by the vehicle being in 'Park' for a protion of the video.")
+                    print("Unable to sync telemetry data to video frame.")
+                    args.no_overlay = telemetry_user_input()
+                else:
+                    print(f"Successfully loaded telemetry data from: {data_filepath}")
             except Exception as e:
                 print(f"Error loading telemetry data from {data_filepath}: {e}")
                 telemetry_df = None
+                args.no_overlay = telemetry_user_input()
 
         if args.preview:
             print("Loading preview... press 'q' to quit.")
@@ -182,6 +180,19 @@ def main():
     print(f"Finished all clips. Releasing final video file: {output_filepath}")
     out.release()
     cv.destroyAllWindows()
+    
+    
+def telemetry_user_input():
+    while True:
+        response = input(
+            "Would you like to continue without the telemetry overlay? 'y' or 'n': "
+        ).strip()
+        if response == "n":
+            sys.exit("Processing aborted due to missing telemetry data.")
+        elif response == "y":
+            return True
+        else:
+            print("Expected response 'y' or 'n'. Please try again.")
 
 
 def process_video(
@@ -366,16 +377,16 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     draw_right_blinker(right_blinker_fill, draw)
 
     # Draw accelerator pedal
-    accelerator_pedal = draw_accelerator_pedal(f, current_frame_data)
+    accelerator_pedal = draw_accelerator_pedal(current_frame_data)
     overlay.paste(accelerator_pedal, (145, 40), mask=accelerator_pedal)
 
     # Draw brake pedal
 
-    brake_pedal = draw_brake_pedal(f, current_frame_data)
+    brake_pedal = draw_brake_pedal(current_frame_data)
     overlay.paste(brake_pedal, (10, 40), mask=brake_pedal)
 
     # Steering Wheel
-    steering_wheel = draw_steering_wheel(f, current_frame_data)
+    steering_wheel = draw_steering_wheel(current_frame_data)
     overlay.paste(steering_wheel, (148, 13), mask=steering_wheel)
 
     # Merge layers
@@ -383,7 +394,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     draw = ImageDraw.Draw(roi_pil)
 
     # 2. Speed
-    speed, speed_unit = get_speed(f, current_frame_data, args)
+    speed, speed_unit = get_speed(current_frame_data, args)
     speed_x = get_text_x(speed, FONT_SPEED, draw, rec_center_x)
     speed_y = rec_center_y - 33
 
@@ -400,7 +411,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     )
 
     # 3. Autopilot State
-    autopilot_state = get_autopilot_state(f, current_frame_data)
+    autopilot_state = get_autopilot_state(current_frame_data)
     autopilot_state_x = get_text_x(autopilot_state, FONT_AUTOPILOT, draw, rec_center_x)
     autopilot_state_y = rec_center_y + 17
 
@@ -413,7 +424,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     )
 
     # 4. Gear State
-    gear_state = get_gear_state(f, current_frame_data)
+    gear_state = get_gear_state(current_frame_data)
     gear_state_x = get_text_x(gear_state, FONT_GEAR, draw, 20) + 1
     gear_state_y = get_text_y(gear_state, FONT_GEAR, draw, 20) + 1
 
