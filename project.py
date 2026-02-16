@@ -2,8 +2,8 @@
 Tesla Dashcam Telemetry Viewer
 
 Processes Tesla dashcam MP4 files and accompanying CSV telemetry files to
-produce a combined multi-camera overlay video with real-time telemetry
-rendered (speed, autopilot state, steering, brake/accelerator, blinkers).
+produce a combined multi-camera video with real-time telemetry
+overlay (speed, autopilot state, steering, brake/accelerator, blinkers).
 
 Usage:
     python project.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview]
