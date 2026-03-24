@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 import math
 import argparse
+import sei_extractor
 
 OVERLAY_BG_COLOR = (0, 0, 0, 220)
 CIRCLE_BG_COLOR = (50, 50, 50, 245)
@@ -76,11 +77,12 @@ def main():
         sys.exit(f"Input path '{input_path}' is not a directory.")
 
     tesla_cam = compile_tesla_cam(input_path)
+    tesla_cam = generate_sei_data(tesla_cam, input_path)
 
     if not args.no_overlay:
         missing_data_timestamps = []
         for timestamp, files_info in tesla_cam.items():
-            if files_info.get("data") == None:
+            if files_info.get("data") is None:
                 missing_data_timestamps.append(timestamp)
         if missing_data_timestamps:
             print("Error: The following timestamps are missing a data file:")
@@ -124,6 +126,7 @@ def main():
 
         if tesla_cam[timestamp]["front"]:
             cap_front = cv.VideoCapture(f"{input_path}/{tesla_cam[timestamp]['front']}")
+            total_frames = int(cap_front.get(cv.CAP_PROP_FRAME_COUNT))
         if tesla_cam[timestamp]["back"]:
             cap_back = cv.VideoCapture(f"{input_path}/{tesla_cam[timestamp]['back']}")
         if tesla_cam[timestamp]["left_repeater"]:
@@ -141,7 +144,9 @@ def main():
                 telemetry_df = pd.read_csv(data_filepath)
                 if len(telemetry_df) != total_frames:
                     print(f"Partial telemetry data found in: {data_filepath}")
-                    print("This can be caused by the vehicle being in 'Park' for a protion of the video.")
+                    print(
+                        "This can be caused by the vehicle being in 'Park' for a protion of the video."
+                    )
                     print("Unable to sync telemetry data to video frame.")
                     args.no_overlay = telemetry_user_input()
                 else:
@@ -180,8 +185,8 @@ def main():
     print(f"Finished all clips. Releasing final video file: {output_filepath}")
     out.release()
     cv.destroyAllWindows()
-    
-    
+
+
 def telemetry_user_input():
     while True:
         response = input(
@@ -297,6 +302,27 @@ def compile_tesla_cam(input_path):
                 tesla_cam[timestamp]["data"] = item.name
             else:
                 tesla_cam[timestamp][file_id] = item.name
+    return tesla_cam
+
+
+def generate_sei_data(tesla_cam, input_path):
+    """Generate SEI Data from mp4 dashcam file using Tesla's sei_extractor.py"""
+    # Auto-generate missing CSV from SEI data
+    for timestamp, files_info in tesla_cam.items():
+        if files_info.get("data") is None and files_info.get("front"):
+            mp4_path = f"{input_path}/{files_info['front']}"
+            csv_path = f"{input_path}/{timestamp}-front_sei.csv"
+            print(f"Generating telemetry CSV from SEI: {csv_path}")
+            try:
+                csv_content = sei_extractor.extract_sei_csv(mp4_path)
+                if csv_content:
+                    with open(csv_path, "w") as f:
+                        f.write(csv_content)
+                    tesla_cam[timestamp]["data"] = f"{timestamp}-front_sei.csv"
+                else:
+                    print(f"Warning: No SEI data in {mp4_path}")
+            except Exception as e:
+                print(f"Error generating CSV for {timestamp}: {e}")
     return tesla_cam
 
 
