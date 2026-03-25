@@ -67,6 +67,11 @@ def main():
         help="enabled render preview while videos are being processed",
         action="store_true",
     )
+    parser.add_argument(
+        "--keep-csv",
+        help="keep generated telemetry csv in input directory",
+        action="store_true"
+    )
 
     args = parser.parse_args()
 
@@ -183,6 +188,17 @@ def main():
             cap_right_repeater.release()
 
     print(f"Finished all clips. Releasing final video file: {output_filepath}")
+    
+    # --- Cleanup auto-generated SEI files ---
+    if not args.keep_csv:
+        for timestamp, files_info in tesla_cam.items():
+            data_file = files_info.get("data")
+            if data_file and data_file.endswith("_generated-sei.csv"):
+                sei_csv_path = input_path / data_file
+                if sei_csv_path.exists():
+                    sei_csv_path.unlink()
+                    print(f"Cleaned up temporary telemetry file: {sei_csv_path}")
+    
     out.release()
     cv.destroyAllWindows()
 
@@ -311,14 +327,14 @@ def generate_sei_data(tesla_cam, input_path):
     for timestamp, files_info in tesla_cam.items():
         if files_info.get("data") is None and files_info.get("front"):
             mp4_path = f"{input_path}/{files_info['front']}"
-            csv_path = f"{input_path}/{timestamp}-front_sei.csv"
+            csv_path = f"{input_path}/{timestamp}-front_generated-sei.csv"
             print(f"Generating telemetry CSV from SEI: {csv_path}")
             try:
                 csv_content = sei_extractor.extract_sei_csv(mp4_path)
                 if csv_content:
                     with open(csv_path, "w") as f:
                         f.write(csv_content)
-                    tesla_cam[timestamp]["data"] = f"{timestamp}-front_sei.csv"
+                    tesla_cam[timestamp]["data"] = f"{timestamp}-front_generated-sei.csv"
                 else:
                     print(f"Warning: No SEI data in {mp4_path}")
             except Exception as e:
