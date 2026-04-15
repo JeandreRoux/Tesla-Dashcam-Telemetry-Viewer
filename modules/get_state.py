@@ -1,19 +1,3 @@
-def get_text_x(text, font, draw, shape_center):
-    """Return the X coordinate to horizontally center text at a given center."""
-    # bbox = (left, top, right, bottom)
-    bbox = draw.textbbox((0, 0), text, font)
-    text_width = bbox[2] - bbox[0]
-    return shape_center - (text_width // 2) - bbox[0]
-
-
-def get_text_y(text, font, draw, shape_center):
-    """Return the Y coordinate to vertically center text at a given center."""
-    # bbox = (left, top, right, bottom)
-    bbox = draw.textbbox((0, 0), text, font)
-    text_height = bbox[3] - bbox[1]
-    return shape_center - (text_height // 2) - bbox[1]
-
-
 def get_gear_state(current_frame_data):
     """Map telemetry 'gear_state' to a single-letter display."""
     match current_frame_data["gear_state"]:

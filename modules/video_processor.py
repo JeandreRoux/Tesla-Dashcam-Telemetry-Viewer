@@ -3,9 +3,9 @@ import numpy as np
 import sys
 
 # Import modules
-import config
-import overlay_renderer
-import data_handler
+from modules import config
+from modules import overlay_renderer
+from modules import data_handler
 
 
 def process_video(

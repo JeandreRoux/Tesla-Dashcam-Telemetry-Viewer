@@ -2,7 +2,8 @@ from PIL import Image, ImageDraw
 import math
 
 # Import modules
-import config
+from modules import config
+from modules import get_state
 
 
 def draw_accelerator_pedal(current_frame_data, width=300, height=300):
@@ -91,14 +92,11 @@ def draw_brake_pedal(current_frame_data, width=300, height=300):
 def draw_steering_wheel(current_frame_data, size=200):
     """Create a steering wheel icon rotated by steering angle and colored by autopilot state."""
     steering_angle = int(current_frame_data["steering_wheel_angle"])
-
-    match current_frame_data["autopilot_state"]:
-        case "AUTOSTEER":
-            color = config.FONT_BLUE
-        case "SELF_DRIVING":
-            color = config.FONT_BLUE
-        case _:
-            color = config.FONT_WHITE
+    
+    if get_state.get_autopilot_state(current_frame_data) == ("Autopilot" or "Self Driving"):
+        color = config.FONT_BLUE
+    else:
+        color = config.FONT_WHITE
 
     # Create a new transparent canvas
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -193,3 +191,19 @@ def draw_right_blinker(blinker_fill, draw):
     ]
 
     draw.polygon(shape, fill=blinker_fill)
+    
+
+def get_text_x(text, font, draw, shape_center):
+    """Return the X coordinate to horizontally center text at a given center."""
+    # bbox = (left, top, right, bottom)
+    bbox = draw.textbbox((0, 0), text, font)
+    text_width = bbox[2] - bbox[0]
+    return shape_center - (text_width // 2) - bbox[0]
+
+
+def get_text_y(text, font, draw, shape_center):
+    """Return the Y coordinate to vertically center text at a given center."""
+    # bbox = (left, top, right, bottom)
+    bbox = draw.textbbox((0, 0), text, font)
+    text_height = bbox[3] - bbox[1]
+    return shape_center - (text_height // 2) - bbox[1]

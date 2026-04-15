@@ -20,12 +20,12 @@ import math
 import argparse
 
 # Import modules
-import config
-import utils
-import overlay_renderer
-import data_handler
-import video_processor
-import sei_extractor
+from modules import config
+from modules import get_state
+from modules import overlay_renderer
+from modules import data_handler
+from modules import video_processor
+from modules import sei_extractor
 
 
 def main():

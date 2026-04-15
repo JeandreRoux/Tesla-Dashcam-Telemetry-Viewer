@@ -1,6 +1,8 @@
-import sei_extractor
 import re
 import sys
+
+# Import modules
+from modules import sei_extractor
 
 def compile_video_data(input_path, args):
     """Scan input directory and map timestamps to camera/telemetry filenames."""
