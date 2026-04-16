@@ -18,7 +18,7 @@ Processes Tesla dashcam MP4 files and accompanying CSV telemetry files to produc
 
 ## Layout
 
-![Screenshot of output layout](layout.png)
+![Screenshot of example output layout](example.png)
 
 
 ## Prerequisites
