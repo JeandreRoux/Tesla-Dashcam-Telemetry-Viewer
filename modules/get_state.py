@@ -31,11 +31,11 @@ def get_speed(current_frame_data, args):
     speed_mps = float(current_frame_data["vehicle_speed_mps"])
     if args.mph:
         speed = speed_mps * 2.237
-        speed_unit = "MPH"
+        unit = "MPH"
     else:
         speed = speed_mps * 3.6
-        speed_unit = "KM/H"
+        unit = "KM/H"
 
     speed = f"{abs(speed):.0f}"
 
-    return speed, speed_unit
+    return speed, unit
