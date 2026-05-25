@@ -36,9 +36,6 @@ def get_speed(current_frame_data, args):
         speed = speed_mps * 3.6
         speed_unit = "KM/H"
 
-    if speed < 0:
-        speed = f"{speed*speed:.0f}"
-    else:
-        speed = f"{speed:.0f}"
+    speed = f"{abs(speed):.0f}"
 
     return speed, speed_unit

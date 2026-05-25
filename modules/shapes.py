@@ -92,8 +92,11 @@ def draw_brake_pedal(current_frame_data, width=300, height=300):
 def draw_steering_wheel(current_frame_data, size=200):
     """Create a steering wheel icon rotated by steering angle and colored by autopilot state."""
     steering_angle = int(current_frame_data["steering_wheel_angle"])
-    
-    if get_state.get_autopilot_state(current_frame_data) in ("Autopilot", "Self Driving"):
+
+    if get_state.get_autopilot_state(current_frame_data) in (
+        "Autopilot",
+        "Self Driving",
+    ):
         color = config.FONT_BLUE
     else:
         color = config.FONT_WHITE
@@ -146,6 +149,8 @@ def draw_steering_wheel(current_frame_data, size=200):
 
 def calculate_fill_angles(accelerator_pedal_position):
     """Compute start/end angles for a circular chord representing pedal fill."""
+    accelerator_pedal_position = max(0, min(accelerator_pedal_position, 100))
+
     fill_pct = int(accelerator_pedal_position) / 100
 
     # Calculate the vertical distance from the center (radius = 1)
@@ -191,7 +196,7 @@ def draw_right_blinker(blinker_fill, draw):
     ]
 
     draw.polygon(shape, fill=blinker_fill)
-    
+
 
 def get_text_x(text, font, draw, shape_center):
     """Return the X coordinate to horizontally center text at a given center."""

@@ -6,26 +6,19 @@ produce a combined multi-camera video with real-time telemetry
 overlay (speed, autopilot state, steering, brake/accelerator, blinkers).
 
 Usage:
-    python project.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview]
+    python main.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview]
 """
 
 import cv2 as cv
-import numpy as np
-from PIL import Image, ImageFont, ImageDraw
-import re
 import sys
 from pathlib import Path
 import pandas as pd
-import math
 import argparse
 
 # Import modules
 from modules import config
-from modules import get_state
-from modules import overlay_renderer
 from modules import data_handler
 from modules import video_processor
-from modules import sei_extractor
 from modules import layout
 
 
@@ -96,11 +89,19 @@ def main():
     cap_temp.release()
 
     # Define output file codec and create the VideoWriter object
-    output_filepath = f"{output_path}/{output_filename}.mp4"
+    if output_path.exists() and not output_path.is_dir():
+        sys.exit(f"Output path '{output_path}' exists but is not a directory.")
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    output_filepath = output_path / f"{output_filename}.mp4"
+
     fourcc = cv.VideoWriter_fourcc(*"mp4v")
     out = cv.VideoWriter(
         output_filepath, fourcc, fps, (canvas_width, canvas_height), isColor=True
     )
+
+    if not out.isOpened():
+        sys.exit(f"FATAL: Could not create output video file: {output_filepath}")
 
     for timestamp in sorted(video_data.keys()):
         cap_front = None
