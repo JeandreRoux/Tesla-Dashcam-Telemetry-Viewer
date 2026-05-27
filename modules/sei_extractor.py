@@ -7,6 +7,7 @@ Quick start:
     protoc --python_out=. dashcam.proto
     python sei_extractor.py path/to/dashcam-video.mp4
 """
+
 import struct
 import sys
 from typing import Generator, Optional, Tuple
@@ -33,30 +34,31 @@ def main(path: str):
     has_sei = False
     with open(path, "rb") as fp:
         offset, size = find_mdat(fp)
-        headers = [
-            field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
+        headers = [field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
         defaults = {
-            'accelerator_pedal_position': '0',
-            'blinker_on_left': 'false',
-            'blinker_on_right': 'false',
-            'brake_applied': 'false',
-            'autopilot_state': 'NONE',
-            'steering_wheel_angle': '0',
-            'vehicle_speed_mps': '0'
+            "accelerator_pedal_position": "0",
+            "blinker_on_left": "false",
+            "blinker_on_right": "false",
+            "brake_applied": "false",
+            "autopilot_state": "NONE",
+            "steering_wheel_angle": "0",
+            "vehicle_speed_mps": "0",
         }
 
         for meta in iter_sei_messages(fp, offset, size):
             if not has_sei:
                 has_sei = True
-                print(','.join(headers))
-            row_dict = {header: '' for header in headers}
-            for key, value in MessageToDict(meta, preserving_proto_field_name=True).items():
+                print(",".join(headers))
+            row_dict = {header: "" for header in headers}
+            for key, value in MessageToDict(
+                meta, preserving_proto_field_name=True
+            ).items():
                 row_dict[key] = value
             # Apply defaults for blanks
             for header in headers:
-                if row_dict[header] == '':
-                    row_dict[header] = defaults.get(header, '')
-            print(','.join(str(row_dict[h]) for h in headers))
+                if row_dict[header] == "":
+                    row_dict[header] = defaults.get(header, "")
+            print(",".join(str(row_dict[h]) for h in headers))
     if not has_sei:
         print("No SEI metadata found. Requirements:")
         print("  * Tesla firmware 2025.44.25 or later")
@@ -88,7 +90,7 @@ def extract_proto_payload(nal: bytes) -> Optional[bytes]:
             continue
         if byte == 0x69:
             if i > 2:
-                return strip_emulation_prevention_bytes(nal[i + 1:-1])
+                return strip_emulation_prevention_bytes(nal[i + 1 : -1])
             break
         break
     return None
@@ -128,7 +130,9 @@ def iter_nals(fp, offset: int, size: int) -> Generator[bytes, None, None]:
         if len(first_two) != 2:
             break
 
-        if (first_two[0] & 0x1F) != NAL_ID_SEI or first_two[1] != NAL_SEI_ID_USER_DATA_UNREGISTERED:
+        if (first_two[0] & 0x1F) != NAL_ID_SEI or first_two[
+            1
+        ] != NAL_SEI_ID_USER_DATA_UNREGISTERED:
             fp.seek(nal_size - 2, 1)
             consumed += 4 + nal_size
             continue  # skip non-SEI NALs
@@ -164,13 +168,13 @@ def find_mdat(fp) -> Tuple[int, int]:
         if atom_size < header_size:
             raise RuntimeError("invalid MP4 atom size")
         fp.seek(atom_size - header_size, 1)
-        
-        
+
+
 def extract_sei_csv(path: str) -> str:
     """Extract SEI metadata from MP4 and return as CSV string. Returns empty string if no data."""
     import io
     from contextlib import redirect_stdout
-    
+
     # Capture stdout to a string
     csv_output = io.StringIO()
     with redirect_stdout(csv_output):
@@ -179,13 +183,13 @@ def extract_sei_csv(path: str) -> str:
     output = csv_output.getvalue().strip()
     if not output:
         return ""
-    
+
     headers = [field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
     expected_header = ",".join(headers)
 
     if output.splitlines()[0] != expected_header:
         return ""
-    
+
     return output
 
 

@@ -6,24 +6,22 @@ produce a combined multi-camera video with real-time telemetry
 overlay (speed, autopilot state, steering, brake/accelerator, blinkers).
 
 Usage:
-    python main.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview]
+    python main.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview] [--keep-csv]
 """
 
 import cv2 as cv
 import sys
 from pathlib import Path
-import pandas as pd
 import argparse
 
 # Import modules
-from modules import config
 from modules import data_handler
 from modules import video_processor
-from modules import layout
+from modules import layouts
+from modules.settings import RenderSettings
 
 
 def main():
-    """Parse CLI arguments, discover clip groups, and orchestrate processing."""
     parser = argparse.ArgumentParser(
         prog="Tesla Dashcam Telemetry Viewer",
         description="Processes Tesla dashcam footage and telemetry data to create a multi-camera overlay video with real-time vehicle telemetry information including speed, autopilot state, steering angle, and pedal positions.",
@@ -48,9 +46,17 @@ def main():
     parser.add_argument(
         "--keep-csv",
         help="keep generated telemetry csv in input directory",
-        action="store_true"
+        action="store_true",
     )
     args = parser.parse_args()
+
+    settings = RenderSettings(
+        no_overlay=args.no_overlay,
+        mph=args.mph,
+        preview=args.preview,
+        keep_csv=args.keep_csv,
+        layout=layouts.FOUR_CAMERA_DEFAULT,
+    )
 
     input_path = Path(args.input)
     output_path = Path(args.output)
@@ -58,123 +64,68 @@ def main():
     if not input_path.is_dir():
         sys.exit(f"Input path '{input_path}' is not a directory.")
 
-    video_data = data_handler.compile_video_data(input_path, args)
-    # Selected layout option - Will change in future for more layout options
-    selected_layout = layout.FOUR_CAMERA_DEFAULT
-    data_handler.validate_camera_data(video_data, selected_layout["required_cameras"])
-    data_handler.validate_telemetry_data(args, video_data, input_path)
+    video_data = data_handler.compile_video_data(input_path, settings)
+    data_handler.validate_camera_data(video_data, settings.layout)
+    data_handler.validate_telemetry_data(settings, video_data, input_path)
 
     # --- Initialize the VideoWriter ---
     # Get video properties
-    first_timestamp = sorted(video_data.keys())[0]
-    reference_video = data_handler.get_available_video_file(video_data[first_timestamp])
-    if reference_video is None:
-        sys.exit("FATAL: No reference video file found.")
+    first_timestamp, fps = video_processor.get_video_fps(input_path, video_data)
 
-    reference_video_path = input_path / reference_video
-
-    if args.no_overlay:
+    if settings.no_overlay:
         output_filename = f"TeslaCam_{first_timestamp}_no-overlay"
     else:
         output_filename = f"TeslaCam_{first_timestamp}"
 
-    cap_temp = cv.VideoCapture(reference_video_path)
-    if not cap_temp.isOpened():
-        sys.exit(f"FATAL: Could not open {reference_video_path} to get video properties.")
-
-    canvas_width = config.CANVAS_WIDTH
-    canvas_height = config.CANVAS_HEIGHT
-    fps = cap_temp.get(cv.CAP_PROP_FPS)
-    total_frames = int(cap_temp.get(cv.CAP_PROP_FRAME_COUNT))
-    cap_temp.release()
-
-    # Define output file codec and create the VideoWriter object
-    if output_path.exists() and not output_path.is_dir():
-        sys.exit(f"Output path '{output_path}' exists but is not a directory.")
-
-    output_path.mkdir(parents=True, exist_ok=True)
-    output_filepath = output_path / f"{output_filename}.mp4"
-
-    fourcc = cv.VideoWriter_fourcc(*"mp4v")
-    out = cv.VideoWriter(
-        output_filepath, fourcc, fps, (canvas_width, canvas_height), isColor=True
+    out, output_filepath = video_processor.create_video_writer(
+        output_path=output_path,
+        output_filename=output_filepath,
+        fps=fps,
     )
 
-    if not out.isOpened():
-        sys.exit(f"FATAL: Could not create output video file: {output_filepath}")
-
     for timestamp in sorted(video_data.keys()):
-        cap_front = None
-        cap_back = None
-        cap_left_repeater = None
-        cap_right_repeater = None
         telemetry_df = None
 
-        if video_data[timestamp].get("front"):
-            cap_front = cv.VideoCapture(f"{input_path}/{video_data[timestamp]['front']}")
-            total_frames = int(cap_front.get(cv.CAP_PROP_FRAME_COUNT))
-        if video_data[timestamp].get("back"):
-            cap_back = cv.VideoCapture(f"{input_path}/{video_data[timestamp]['back']}")
-        if video_data[timestamp].get("left_repeater"):
-            cap_left_repeater = cv.VideoCapture(
-                f"{input_path}/{video_data[timestamp]['left_repeater']}"
-            )
-        if video_data[timestamp].get("right_repeater"):
-            cap_right_repeater = cv.VideoCapture(
-                f"{input_path}/{video_data[timestamp]['right_repeater']}"
+        captures = video_processor.open_captures(
+            input_path=input_path,
+            files_info=video_data[timestamp],
+            layout=settings.layout,
+        )
+
+        reference_camera = settings.layout["required_cameras"][0]
+        total_frames = int(captures[reference_camera].get(cv.CAP_PROP_FRAME_COUNT))
+
+        data_file = video_data[timestamp].get("data")
+        if data_file:
+            telemetry_df = data_handler.load_telemetry_data(
+                input_path=input_path,
+                data_file=data_file,
+                total_frames=total_frames,
+                settings=settings,
             )
 
-        if video_data[timestamp].get("data"):
-            data_filepath = input_path / video_data[timestamp]['data']
-            try:
-                telemetry_df = pd.read_csv(data_filepath)
-                if len(telemetry_df) != total_frames:
-                    print(f"Partial telemetry data found in: {data_filepath}")
-                    print(
-                        "This can be caused by the vehicle being in 'Park' for a protion of the video."
-                    )
-                    print("Unable to sync telemetry data to video frame.")
-                    args.no_overlay = data_handler.telemetry_user_input()
-                else:
-                    print(f"Successfully loaded telemetry data from: {data_filepath}")
-            except Exception as e:
-                print(f"Error loading telemetry data from {data_filepath}: {e}")
-                telemetry_df = None
-                args.no_overlay = data_handler.telemetry_user_input()
-
-        if args.preview:
+        if settings.preview:
             print("Loading preview... press 'q' to quit.")
             print("Processing videos...")
         else:
             print("Processing videos...")
 
         video_processor.process_video(
-            cap_front=cap_front,
-            cap_back=cap_back,
-            cap_left_repeater=cap_left_repeater,
-            cap_right_repeater=cap_right_repeater,
+            captures=captures,
             telemetry_df=telemetry_df,
             out=out,
-            args=args,
             input_path=input_path,
             video_data=video_data,
-            selected_layout=selected_layout
+            settings=settings,
         )
 
         # Release the input video captures for this timestamp
-        if cap_front:
-            cap_front.release()
-        if cap_back:
-            cap_back.release()
-        if cap_left_repeater:
-            cap_left_repeater.release()
-        if cap_right_repeater:
-            cap_right_repeater.release()
+        video_processor.release_captures(captures)
 
-    print(f"Finished all clips. Releasing final video file: {output_filepath}")
-    
-    data_handler.remove_generated_csv(input_path, video_data, args)
-    
+    print(f"Finished all clips. Released final video file: {output_filepath}")
+
+    data_handler.remove_generated_csv(input_path, video_data, settings)
+
     out.release()
     cv.destroyAllWindows()
 

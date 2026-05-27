@@ -7,27 +7,27 @@ from modules.get_state import get_speed, get_gear_state, get_autopilot_state
 class TestGetSpeed(unittest.TestCase):
     def test_positive_speed_uses_kmh_by_default(self):
         current_frame_data = {"vehicle_speed_mps": 10}
-        args = Namespace(mph=False)
+        settings = Namespace(mph=False)
 
-        speed, unit = get_speed(current_frame_data, args)
+        speed, unit = get_speed(current_frame_data, settings)
 
         self.assertEqual(speed, "36")
         self.assertEqual(unit, "KM/H")
 
     def test_negative_speed_uses_absolute_value(self):
         current_frame_data = {"vehicle_speed_mps": -5}
-        args = Namespace(mph=False)
+        settings = Namespace(mph=False)
 
-        speed, unit = get_speed(current_frame_data, args)
+        speed, unit = get_speed(current_frame_data, settings)
 
         self.assertEqual(speed, "18")
         self.assertEqual(unit, "KM/H")
 
     def test_speed_can_use_mph(self):
         current_frame_data = {"vehicle_speed_mps": 10}
-        args = Namespace(mph=True)
+        settings = Namespace(mph=True)
 
-        speed, unit = get_speed(current_frame_data, args)
+        speed, unit = get_speed(current_frame_data, settings)
 
         self.assertEqual(speed, "22")
         self.assertEqual(unit, "MPH")

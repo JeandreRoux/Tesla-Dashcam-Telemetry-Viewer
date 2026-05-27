@@ -1,9 +1,11 @@
 import re
 import sys
 import pandas as pd
+from pathlib import Path
 
 # Import modules
 from modules import sei_extractor
+from modules import layouts
 
 CAMERA_KEYS = ("front", "back", "left_repeater", "right_repeater")
 
@@ -20,43 +22,8 @@ REQUIRED_TELEMETRY_COLUMNS = (
     "autopilot_state",
 )
 
-def telemetry_csv_is_valid(csv_path):
-    """Read CSV headers to verify valid telemetry file"""
-    try:
-        df = pd.read_csv(csv_path, nrows=0)
-    except Exception as e:
-        print(f"ERROR reading telemetry csv for validation: {e}")
-        return False
-    
-    return all(column in df.columns for column in REQUIRED_TELEMETRY_COLUMNS)
 
-
-def validate_camera_data(video_data, required_cameras=DEFAULT_REQUIRED_CAMERAS):
-    if not video_data:
-        sys.exit("No Tesla dashcam files found in the input directory.")
-
-    invalid_timestamps = []
-
-    for timestamp, files_info in video_data.items():
-        missing_cameras = [
-            camera_key
-            for camera_key in required_cameras
-            if not files_info.get(camera_key)
-        ]
-
-        if missing_cameras:
-            invalid_timestamps.append((timestamp, missing_cameras))
-
-    if invalid_timestamps:
-        print("The following timestamps are missing required camera files:")
-        for timestamp, missing_cameras in invalid_timestamps:
-            missing = ", ".join(missing_cameras)
-            print(f"- {timestamp}: {missing}")
-
-        sys.exit("Processing aborted due to missing camera files.")
-
-
-def compile_video_data(input_path, args):
+def compile_video_data(input_path: Path, settings) -> dict[str, dict[str, str | None]]:
     """Scan input directory and map timestamps to camera/telemetry filenames."""
     pattern = re.compile(
         r"([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})-([a-z_]+)\.(mp4|csv)"
@@ -83,24 +50,28 @@ def compile_video_data(input_path, args):
                 print(f"Found telemetry CSV: {video_data[timestamp]['data']}")
             else:
                 video_data[timestamp][file_id] = item.name
-                
-    video_data = generate_sei_data(video_data, input_path, args)
-    
+
+    video_data = generate_sei_data(video_data, input_path, settings)
+
     return video_data
 
 
-def get_available_video_file(files_info):
+def get_available_video_file(files_info: dict[str, str | None]) -> str | None:
     """Return the first available video filename in camera preference order."""
     for camera_key in CAMERA_KEYS:
         video_file = files_info.get(camera_key)
         if video_file:
             return video_file
-        
+
     return None
 
 
-def generate_sei_data(video_data, input_path, args):
-    """Generate SEI Data from mp4 dashcam file using Tesla's sei_extractor.py"""
+def generate_sei_data(
+    video_data: dict[str, dict[str, str | None]],
+    input_path: Path,
+    settings,
+) -> dict[str, dict[str, str | None]]:
+    """Generate missing telemetry CSV files from embedded SEI metadata."""
     # Auto-generate missing CSV from SEI data
     for timestamp, files_info in video_data.items():
         if files_info.get("data") is not None:
@@ -121,14 +92,61 @@ def generate_sei_data(video_data, input_path, args):
                 video_data[timestamp]["data"] = f"{timestamp}-generated_sei.csv"
             else:
                 print(f"Warning: No SEI data in {mp4_path}")
-                args.no_overlay = telemetry_user_input()
+                settings.no_overlay = telemetry_user_input()
         except Exception as e:
             print(f"Error generating CSV for {timestamp}: {e}")
     return video_data
 
 
-def validate_telemetry_data(args, video_data, input_path):
-    if args.no_overlay:
+def telemetry_csv_is_valid(csv_path: Path) -> bool:
+    """Return True when a CSV contains the required telemetry columns."""
+    try:
+        df = pd.read_csv(csv_path, nrows=0)
+    except Exception as e:
+        print(f"ERROR reading telemetry csv for validation: {e}")
+        return False
+
+    return all(column in df.columns for column in REQUIRED_TELEMETRY_COLUMNS)
+
+
+def validate_camera_data(
+    video_data: dict[str, dict[str, str | None]],
+    layout: dict[str, tuple[str, ...] | dict[str, layouts.Region]],
+) -> None:
+    """Exit if any clip group is missing cameras required by the selected layout."""
+    if not video_data:
+        sys.exit("No Tesla dashcam files found in the input directory.")
+
+    required_cameras = layout["required_cameras"]
+
+    invalid_timestamps = []
+
+    for timestamp, files_info in video_data.items():
+        missing_cameras = [
+            camera_key
+            for camera_key in required_cameras
+            if not files_info.get(camera_key)
+        ]
+
+        if missing_cameras:
+            invalid_timestamps.append((timestamp, missing_cameras))
+
+    if invalid_timestamps:
+        print("The following timestamps are missing required camera files:")
+        for timestamp, missing_cameras in invalid_timestamps:
+            missing = ", ".join(missing_cameras)
+            print(f"- {timestamp}: {missing}")
+
+        sys.exit("Processing aborted due to missing camera files.")
+
+
+def validate_telemetry_data(
+    settings,
+    video_data: dict[str, dict[str, str | None]],
+    input_path: Path,
+) -> None:
+    """Prompt to disable overlays when telemetry CSV files are missing or invalid."""
+    if settings.no_overlay:
         return
 
     invalid_data_timestamps = []
@@ -143,29 +161,49 @@ def validate_telemetry_data(args, video_data, input_path):
         csv_path = input_path / data_file
 
         if not telemetry_csv_is_valid(csv_path):
-            invalid_data_timestamps.append((timestamp, f"invalid telemetry CSV: {data_file}"))
+            invalid_data_timestamps.append(
+                (timestamp, f"invalid telemetry CSV: {data_file}")
+            )
 
     if invalid_data_timestamps:
         print("Telemetry data could not be used for the following timestamps:")
         for timestamp, reason in invalid_data_timestamps:
             print(f"- {timestamp}: {reason}")
-        
-        args.no_overlay = telemetry_user_input()
+
+        settings.no_overlay = telemetry_user_input()
 
 
-def remove_generated_csv(input_path, video_data, args):
-        # --- Cleanup auto-generated SEI files ---
-    if not args.keep_csv:
-        for timestamp, files_info in video_data.items():
-            data_file = files_info.get("data")
-            if data_file and data_file.endswith("-generated_sei.csv"):
-                sei_csv_path = input_path / data_file
-                if sei_csv_path.exists():
-                    sei_csv_path.unlink()
-                    print(f"Cleaned up temporary telemetry file: {sei_csv_path}")
-                    
-                    
-def telemetry_user_input():
+def load_telemetry_data(
+    input_path: Path,
+    data_file: str,
+    total_frames: int,
+    settings,
+) -> pd.DataFrame | None:
+    """Load telemetry CSV data and disable overlays if it cannot sync to video frames."""
+    data_filepath = input_path / data_file
+
+    try:
+        telemetry_df = pd.read_csv(data_filepath)
+    except Exception as e:
+        print(f"Error loading telemetry data from {data_filepath}: {e}")
+        settings.no_overlay = telemetry_user_input()
+        return None
+
+    if len(telemetry_df) != total_frames:
+        print(f"Partial telemetry data found in: {data_filepath}")
+        print(
+            "This can be caused by the vehicle being in 'Park' for a portion of the video."
+        )
+        print("Unable to sync telemetry data to video frame.")
+        settings.no_overlay = telemetry_user_input()
+        return None
+
+    print(f"Successfully loaded telemetry data from: {data_filepath}")
+    return telemetry_df
+
+
+def telemetry_user_input() -> bool:
+    """Ask whether processing should continue without telemetry overlays."""
     while True:
         response = input(
             "Would you like to continue without the telemetry overlay? 'y' or 'n': "
@@ -176,3 +214,19 @@ def telemetry_user_input():
             return True
         else:
             print("Expected response 'y' or 'n'. Please try again.")
+
+
+def remove_generated_csv(
+    input_path: Path,
+    video_data: dict[str, dict[str, str | None]],
+    settings,
+) -> None:
+    """Remove temporary SEI-generated CSV files unless the user chose to keep them."""
+    if not settings.keep_csv:
+        for timestamp, files_info in video_data.items():
+            data_file = files_info.get("data")
+            if data_file and data_file.endswith("-generated_sei.csv"):
+                sei_csv_path = input_path / data_file
+                if sei_csv_path.exists():
+                    sei_csv_path.unlink()
+                    print(f"Cleaned up temporary telemetry file: {sei_csv_path}")

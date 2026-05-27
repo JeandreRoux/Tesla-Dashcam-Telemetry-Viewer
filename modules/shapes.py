@@ -147,7 +147,7 @@ def draw_steering_wheel(current_frame_data, size=200):
     return img
 
 
-def calculate_fill_angles(accelerator_pedal_position):
+def calculate_fill_angles(accelerator_pedal_position: float) -> tuple[int, int]:
     """Compute start/end angles for a circular chord representing pedal fill."""
     accelerator_pedal_position = max(0, min(accelerator_pedal_position, 100))
 
