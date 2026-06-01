@@ -2,6 +2,8 @@
 
 Processes Tesla dashcam MP4 files and accompanying CSV telemetry files to produce a combined multi-camera video with real-time telemetry overlay.
 
+This is an unofficial community project and is not affiliated with, endorsed by, or supported by Tesla.
+
 ---
 
 ## Features
@@ -89,6 +91,20 @@ Telemetry can be read from embedded SEI data when available. You can also provid
 YYYY-MM-DD_HH-MM-SS.csv
 ```
 
+## Encrypted Dashcam Clips
+
+Tesla software update 2026.20 introduced optional dashcam and Sentry Mode video encryption. If your clips are encrypted, this tool will not be able to read them directly.
+
+Before running this program, decrypt the clips using Tesla's official Dashcam web tool:
+
+```text
+https://dashcam.tesla.com
+```
+
+After decrypting, use the exported/decrypted MP4 files as your input files.
+
+You can also disable dashcam encryption in the vehicle under `Controls > Safety > Encrypt Dashcam Recordings`, if you prefer to keep future clips unencrypted.
+
 ## Usage
 
 1. **Run the script**
@@ -108,6 +124,14 @@ python main.py --input /path/to/teslacam/clips --output /path/to/save/video
 * **Desktop App**: Provide a graphical interface for selecting clips, configuring exports, and previewing results.
 * **G-Force Indicator**: Visualize acceleration, braking, and cornering forces from embedded accelerometer telemetry.
 * **Location Info**: Show heading and GPS coordinates, with room for future mapping features.
+
+## Known Limitations
+* The current renderer supports the default four-camera layout only.
+* The default layout requires all four camera files for each timestamp.
+* Additional B-pillar camera files from HW4 vehicles are not currently supported, but support is planned.
+* Telemetry overlays depend on SEI metadata or a matching CSV file being available.
+* Some clips may contain missing or partial telemetry, especially when the car is parked.
+* MP4 output depends on OpenCV having working codec support on your system.
 
 ## Troubleshooting
 * Not all Tesla-generated dashcam clips contain SEI data. Only clips recorded on Tesla firmware 2025.44.25 or later and HW3 or above contain SEI data. If car is parked, SEI data may not be present.

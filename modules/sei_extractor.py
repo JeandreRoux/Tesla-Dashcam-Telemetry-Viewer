@@ -10,12 +10,30 @@ Quick start:
 
 import struct
 import sys
+from csv import writer
+from io import StringIO
+from pathlib import Path
 from typing import Generator, Optional, Tuple
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError
 
 from utils import dashcam_pb2
+
+NO_SEI_MESSAGE = """No SEI metadata found. Requirements:
+  * Tesla firmware 2025.44.25 or later
+  * HW3 or above
+  * If car is parked, SEI data may not be present"""
+
+DEFAULT_VALUES = {
+    "accelerator_pedal_position": "0",
+    "blinker_on_left": "false",
+    "blinker_on_right": "false",
+    "brake_applied": "false",
+    "autopilot_state": "NONE",
+    "steering_wheel_angle": "0",
+    "vehicle_speed_mps": "0",
+}
 
 
 def run():
@@ -30,40 +48,53 @@ def run():
 
 
 def main(path: str):
-    """Main function to extract and print SEI metadata from the video file, in CSV format."""
-    has_sei = False
+    """Extract and print SEI metadata from the video file as CSV."""
+    csv_content = extract_sei_csv(path)
+
+    if csv_content:
+        print(csv_content)
+    else:
+        print(NO_SEI_MESSAGE)
+
+
+def get_headers() -> list[str]:
+    """Return SEI metadata field names in protobuf descriptor order."""
+    return [field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
+
+
+def metadata_to_row(meta, headers: list[str]) -> list[str]:
+    """Convert a parsed SEI metadata message into a CSV row."""
+    row = {header: "" for header in headers}
+    row.update(MessageToDict(meta, preserving_proto_field_name=True))
+
+    return [str(row[header] or DEFAULT_VALUES.get(header, "")) for header in headers]
+
+
+def build_csv(headers: list[str], rows: list[list[str]]) -> str:
+    """Build CSV text from headers and rows."""
+    if not rows:
+        return ""
+
+    output = StringIO()
+    csv_writer = writer(output, lineterminator="\n")
+    csv_writer.writerow(headers)
+    csv_writer.writerows(rows)
+
+    return output.getvalue().strip()
+
+
+def extract_sei_csv(path: str | Path) -> str:
+    """Extract SEI metadata from an MP4 file and return CSV text."""
+    rows = []
+    headers = get_headers()
+
     with open(path, "rb") as fp:
         offset, size = find_mdat(fp)
-        headers = [field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
-        defaults = {
-            "accelerator_pedal_position": "0",
-            "blinker_on_left": "false",
-            "blinker_on_right": "false",
-            "brake_applied": "false",
-            "autopilot_state": "NONE",
-            "steering_wheel_angle": "0",
-            "vehicle_speed_mps": "0",
-        }
 
         for meta in iter_sei_messages(fp, offset, size):
-            if not has_sei:
-                has_sei = True
-                print(",".join(headers))
-            row_dict = {header: "" for header in headers}
-            for key, value in MessageToDict(
-                meta, preserving_proto_field_name=True
-            ).items():
-                row_dict[key] = value
-            # Apply defaults for blanks
-            for header in headers:
-                if row_dict[header] == "":
-                    row_dict[header] = defaults.get(header, "")
-            print(",".join(str(row_dict[h]) for h in headers))
-    if not has_sei:
-        print("No SEI metadata found. Requirements:")
-        print("  * Tesla firmware 2025.44.25 or later")
-        print("  * HW3 or above")
-        print("  * If car is parked, SEI data may not be present")
+            rows.append(metadata_to_row(meta, headers))
+
+    return build_csv(headers, rows)
 
 
 def iter_sei_messages(fp, offset: int, size: int):
@@ -168,29 +199,6 @@ def find_mdat(fp) -> Tuple[int, int]:
         if atom_size < header_size:
             raise RuntimeError("invalid MP4 atom size")
         fp.seek(atom_size - header_size, 1)
-
-
-def extract_sei_csv(path: str) -> str:
-    """Extract SEI metadata from MP4 and return as CSV string. Returns empty string if no data."""
-    import io
-    from contextlib import redirect_stdout
-
-    # Capture stdout to a string
-    csv_output = io.StringIO()
-    with redirect_stdout(csv_output):
-        main(path)
-
-    output = csv_output.getvalue().strip()
-    if not output:
-        return ""
-
-    headers = [field.name for field in dashcam_pb2.SeiMetadata.DESCRIPTOR.fields]
-    expected_header = ",".join(headers)
-
-    if output.splitlines()[0] != expected_header:
-        return ""
-
-    return output
 
 
 if __name__ == "__main__":

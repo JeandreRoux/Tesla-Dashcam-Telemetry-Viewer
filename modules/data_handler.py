@@ -6,6 +6,7 @@ from pathlib import Path
 # Import modules
 from modules import sei_extractor
 from modules import layouts
+from modules.settings import RenderSettings
 
 CAMERA_KEYS = ("front", "back", "left_repeater", "right_repeater")
 
@@ -22,9 +23,12 @@ REQUIRED_TELEMETRY_COLUMNS = (
     "autopilot_state",
 )
 
+ClipFiles = dict[str, str | None]
+VideoData = dict[str, ClipFiles]
 
-def compile_video_data(input_path: Path, settings) -> dict[str, dict[str, str | None]]:
-    """Scan input directory and map timestamps to camera/telemetry filenames."""
+
+def compile_video_data(input_path: Path, settings: RenderSettings) -> VideoData:
+    """Build clip groups from Tesla dashcam filenames in the input directory."""
     pattern = re.compile(
         r"([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})-([a-z_]+)\.(mp4|csv)"
     )
@@ -56,7 +60,7 @@ def compile_video_data(input_path: Path, settings) -> dict[str, dict[str, str | 
     return video_data
 
 
-def get_available_video_file(files_info: dict[str, str | None]) -> str | None:
+def get_available_video_file(files_info: ClipFiles) -> str | None:
     """Return the first available video filename in camera preference order."""
     for camera_key in CAMERA_KEYS:
         video_file = files_info.get(camera_key)
@@ -67,10 +71,10 @@ def get_available_video_file(files_info: dict[str, str | None]) -> str | None:
 
 
 def generate_sei_data(
-    video_data: dict[str, dict[str, str | None]],
+    video_data: VideoData,
     input_path: Path,
-    settings,
-) -> dict[str, dict[str, str | None]]:
+    settings: RenderSettings,
+) -> VideoData:
     """Generate missing telemetry CSV files from embedded SEI metadata."""
     # Auto-generate missing CSV from SEI data
     for timestamp, files_info in video_data.items():
@@ -110,8 +114,8 @@ def telemetry_csv_is_valid(csv_path: Path) -> bool:
 
 
 def validate_camera_data(
-    video_data: dict[str, dict[str, str | None]],
-    layout: dict[str, tuple[str, ...] | dict[str, layouts.Region]],
+    video_data: VideoData,
+    layout: layouts.LayoutConfig,
 ) -> None:
     """Exit if any clip group is missing cameras required by the selected layout."""
     if not video_data:
@@ -141,11 +145,11 @@ def validate_camera_data(
 
 
 def validate_telemetry_data(
-    settings,
-    video_data: dict[str, dict[str, str | None]],
+    settings: RenderSettings,
+    video_data: VideoData,
     input_path: Path,
 ) -> None:
-    """Prompt to disable overlays when telemetry CSV files are missing or invalid."""
+    """Validate telemetry files and prompt to continue without overlays if needed."""
     if settings.no_overlay:
         return
 
@@ -177,7 +181,7 @@ def load_telemetry_data(
     input_path: Path,
     data_file: str,
     total_frames: int,
-    settings,
+    settings: RenderSettings,
 ) -> pd.DataFrame | None:
     """Load telemetry CSV data and disable overlays if it cannot sync to video frames."""
     data_filepath = input_path / data_file
@@ -218,8 +222,8 @@ def telemetry_user_input() -> bool:
 
 def remove_generated_csv(
     input_path: Path,
-    video_data: dict[str, dict[str, str | None]],
-    settings,
+    video_data: VideoData,
+    settings: RenderSettings,
 ) -> None:
     """Remove temporary SEI-generated CSV files unless the user chose to keep them."""
     if not settings.keep_csv:

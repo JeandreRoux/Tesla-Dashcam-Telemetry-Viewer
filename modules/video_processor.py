@@ -9,6 +9,7 @@ from modules import config
 from modules import overlay_renderer
 from modules import data_handler
 from modules import layouts
+from modules.settings import RenderSettings
 
 CANVAS_WIDTH = config.CANVAS_WIDTH
 CANVAS_HEIGHT = config.CANVAS_HEIGHT
@@ -16,9 +17,9 @@ CANVAS_HEIGHT = config.CANVAS_HEIGHT
 
 def get_video_fps(
     input_path: Path,
-    video_data: dict[str, dict[str, str | None]],
+    video_data: data_handler.VideoData,
 ) -> tuple[str, float]:
-    """Return the first clip timestamp and FPS from a reference video."""
+    """Return the first clip timestamp and FPS from the first available camera file."""
     first_timestamp = sorted(video_data.keys())[0]
     reference_video = data_handler.get_available_video_file(video_data[first_timestamp])
     if reference_video is None:
@@ -66,8 +67,8 @@ def create_video_writer(
 
 def open_captures(
     input_path: Path,
-    files_info: dict[str, str | None],
-    layout: dict[str, tuple[str, ...] | dict[str, layouts.Region]],
+    files_info: data_handler.ClipFiles,
+    layout: layouts.LayoutConfig,
 ) -> dict[str, cv.VideoCapture]:
     """Open VideoCapture objects for the required cameras in a clip group."""
     required_cameras = layout["required_cameras"]
@@ -82,13 +83,20 @@ def open_captures(
     return captures
 
 
+def get_total_frames(
+    captures: dict[str, cv.VideoCapture],
+    layout: layouts.LayoutConfig,
+) -> int:
+    """Return the frame count from the layout's reference camera."""
+    reference_camera = layout["required_cameras"][0]
+    return int(captures[reference_camera].get(cv.CAP_PROP_FRAME_COUNT))
+
+
 def process_video(
-    captures: dict,
+    captures: dict[str, cv.VideoCapture],
     telemetry_df: pd.DataFrame | None,
     out: cv.VideoWriter,
-    input_path: Path,
-    video_data: dict[str, dict[str, str | None]],
-    settings,
+    settings: RenderSettings,
 ) -> None:
     """Render frames from the selected layout and write them to the output video."""
 
@@ -127,13 +135,10 @@ def process_video(
         frame_index += 1
 
         if settings.preview:
-            cv.imshow("Preview", canvas)  # Shows the video in a window
-            if cv.waitKey(1) & 0xFF == ord("q"):  # Lets you quit by pressing 'q'
-                for capture in captures.values():
-                    capture.release()
-                out.release()
-                cv.destroyAllWindows()
-                data_handler.remove_generated_csv(input_path, video_data, settings)
+            # Shows the video in a window
+            cv.imshow("Preview", canvas)
+            # Lets you quit by pressing 'q'
+            if cv.waitKey(1) & 0xFF == ord("q"):
                 sys.exit("User stopped program.")
 
         # write frame
@@ -144,3 +149,8 @@ def release_captures(captures: dict[str, cv.VideoCapture]) -> None:
     """Release all open VideoCapture objects."""
     for capture in captures.values():
         capture.release()
+
+
+def close_preview_windows() -> None:
+    """Close any OpenCV preview windows."""
+    cv.destroyAllWindows()

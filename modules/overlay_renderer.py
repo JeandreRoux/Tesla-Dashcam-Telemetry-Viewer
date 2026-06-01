@@ -6,6 +6,7 @@ import numpy as np
 from modules import config
 from modules import shapes
 from modules import get_state
+from modules.settings import RenderSettings
 
 blinker_state = {
     "left": {"state": False, "frame": 0},
@@ -13,8 +14,8 @@ blinker_state = {
 }
 
 
-def draw_overlay(canvas, f, telemetry_df, frame_index, settings):
-    """Draw the telemetry overlay into a fixed ROI of the canvas."""
+def draw_overlay(canvas, f, telemetry_df, frame_index, settings: RenderSettings):
+    """Draw speed, gear, autopilot, blinker, steering, and pedal state onto the canvas."""
     # Read current frame data
     current_frame_data = telemetry_df.iloc[frame_index]
 

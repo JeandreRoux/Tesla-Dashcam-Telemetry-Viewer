@@ -9,7 +9,6 @@ Usage:
     python main.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview] [--keep-csv]
 """
 
-import cv2 as cv
 import sys
 from pathlib import Path
 import argparse
@@ -79,55 +78,55 @@ def main():
 
     out, output_filepath = video_processor.create_video_writer(
         output_path=output_path,
-        output_filename=output_filepath,
+        output_filename=output_filename,
         fps=fps,
     )
 
-    for timestamp in sorted(video_data.keys()):
-        telemetry_df = None
+    try:
+        for timestamp in sorted(video_data.keys()):
+            telemetry_df = None
 
-        captures = video_processor.open_captures(
-            input_path=input_path,
-            files_info=video_data[timestamp],
-            layout=settings.layout,
-        )
-
-        reference_camera = settings.layout["required_cameras"][0]
-        total_frames = int(captures[reference_camera].get(cv.CAP_PROP_FRAME_COUNT))
-
-        data_file = video_data[timestamp].get("data")
-        if data_file:
-            telemetry_df = data_handler.load_telemetry_data(
+            captures = video_processor.open_captures(
                 input_path=input_path,
-                data_file=data_file,
-                total_frames=total_frames,
-                settings=settings,
+                files_info=video_data[timestamp],
+                layout=settings.layout,
             )
 
-        if settings.preview:
-            print("Loading preview... press 'q' to quit.")
-            print("Processing videos...")
-        else:
-            print("Processing videos...")
+            try:
+                total_frames = video_processor.get_total_frames(
+                    captures,
+                    settings.layout,
+                )
 
-        video_processor.process_video(
-            captures=captures,
-            telemetry_df=telemetry_df,
-            out=out,
-            input_path=input_path,
-            video_data=video_data,
-            settings=settings,
-        )
+                data_file = video_data[timestamp].get("data")
+                if data_file:
+                    telemetry_df = data_handler.load_telemetry_data(
+                        input_path=input_path,
+                        data_file=data_file,
+                        total_frames=total_frames,
+                        settings=settings,
+                    )
 
-        # Release the input video captures for this timestamp
-        video_processor.release_captures(captures)
+                if settings.preview:
+                    print("Loading preview... press 'q' to quit.")
+                    print("Processing videos...")
+                else:
+                    print("Processing videos...")
 
-    print(f"Finished all clips. Released final video file: {output_filepath}")
+                video_processor.process_video(
+                    captures=captures,
+                    telemetry_df=telemetry_df,
+                    out=out,
+                    settings=settings,
+                )
+            finally:
+                video_processor.release_captures(captures)
 
-    data_handler.remove_generated_csv(input_path, video_data, settings)
-
-    out.release()
-    cv.destroyAllWindows()
+        print(f"Finished all clips. Released final video file: {output_filepath}")
+    finally:
+        data_handler.remove_generated_csv(input_path, video_data, settings)
+        out.release()
+        video_processor.close_preview_windows()
 
 
 if __name__ == "__main__":

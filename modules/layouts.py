@@ -1,6 +1,7 @@
 import cv2 as cv
 
 Region = tuple[int, int, int, int]
+LayoutConfig = dict[str, tuple[str, ...] | dict[str, Region]]
 
 # Layout options
 FOUR_CAMERA_DEFAULT = {
@@ -24,7 +25,7 @@ def place_frame(canvas, frame, region: Region) -> None:
 def render_layout(
     canvas,
     frames: dict[str, object],
-    layout_config=FOUR_CAMERA_DEFAULT,
+    layout_config: LayoutConfig = FOUR_CAMERA_DEFAULT,
 ):
     """Render all frames defined by a layout config onto the canvas."""
     for camera_key, region in layout_config["regions"].items():
