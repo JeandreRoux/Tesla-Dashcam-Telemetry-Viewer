@@ -78,7 +78,14 @@ def open_captures(
     for camera_key in required_cameras:
         video_file = files_info.get(camera_key)
         if video_file:
-            captures[camera_key] = cv.VideoCapture(input_path / video_file)
+            video_path = input_path / video_file
+            capture = cv.VideoCapture(video_path)
+
+            if not capture.isOpened():
+                release_captures(captures)
+                sys.exit(f"FATAL: Could not open {video_path}")
+
+            captures[camera_key] = capture
 
     return captures
 
@@ -99,11 +106,6 @@ def process_video(
     settings: RenderSettings,
 ) -> None:
     """Render frames from the selected layout and write them to the output video."""
-
-    for camera_key, capture in captures.items():
-        if not capture.isOpened():
-            print(f"Cannot open {camera_key} video file")
-            return
 
     frame_index = 0
 
