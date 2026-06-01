@@ -6,14 +6,16 @@ import numpy as np
 from modules import config
 from modules import shapes
 from modules import get_state
+from modules.settings import RenderSettings
 
 blinker_state = {
     "left": {"state": False, "frame": 0},
-    "right": {"state": False, "frame": 0}
+    "right": {"state": False, "frame": 0},
 }
 
-def draw_overlay(canvas, f, telemetry_df, frame_index, args):
-    """Draw the telemetry overlay into a fixed ROI of the canvas."""
+
+def draw_overlay(canvas, f, telemetry_df, frame_index, settings: RenderSettings):
+    """Draw speed, gear, autopilot, blinker, steering, and pedal state onto the canvas."""
     # Read current frame data
     current_frame_data = telemetry_df.iloc[frame_index]
 
@@ -105,7 +107,7 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     draw = ImageDraw.Draw(roi_pil)
 
     # 2. Speed
-    speed, speed_unit = get_state.get_speed(current_frame_data, args)
+    speed, speed_unit = get_state.get_speed(current_frame_data, settings)
     speed_x = shapes.get_text_x(speed, config.FONT_SPEED, draw, rec_center_x)
     speed_y = rec_center_y - 33
 
@@ -113,17 +115,24 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     draw.text((speed_x, speed_y), speed, font=config.FONT_SPEED, fill=config.FONT_WHITE)
 
     # Speed Unit
-    speed_unit_x = shapes.get_text_x(speed_unit, config.FONT_SPEED_UNIT, draw, rec_center_x)
+    speed_unit_x = shapes.get_text_x(
+        speed_unit, config.FONT_SPEED_UNIT, draw, rec_center_x
+    )
     speed_unit_y = rec_center_y + 1
 
     # Draw Speed Unit
     draw.text(
-        (speed_unit_x, speed_unit_y), speed_unit, font=config.FONT_SPEED_UNIT, fill=config.FONT_WHITE
+        (speed_unit_x, speed_unit_y),
+        speed_unit,
+        font=config.FONT_SPEED_UNIT,
+        fill=config.FONT_WHITE,
     )
 
     # 3. Autopilot State
     autopilot_state = get_state.get_autopilot_state(current_frame_data)
-    autopilot_state_x = shapes.get_text_x(autopilot_state, config.FONT_AUTOPILOT, draw, rec_center_x)
+    autopilot_state_x = shapes.get_text_x(
+        autopilot_state, config.FONT_AUTOPILOT, draw, rec_center_x
+    )
     autopilot_state_y = rec_center_y + 17
 
     # Draw Autopilot State
@@ -140,7 +149,12 @@ def draw_overlay(canvas, f, telemetry_df, frame_index, args):
     gear_state_y = shapes.get_text_y(gear_state, config.FONT_GEAR, draw, 20) + 1
 
     # Draw Gear State
-    draw.text((gear_state_x, gear_state_y), gear_state, font=config.FONT_GEAR, fill=config.FONT_WHITE)
+    draw.text(
+        (gear_state_x, gear_state_y),
+        gear_state,
+        font=config.FONT_GEAR,
+        fill=config.FONT_WHITE,
+    )
 
     # CONVERT BACK
     final_roi = cv.cvtColor(np.array(roi_pil.convert("RGB")), cv.COLOR_RGB2BGR)

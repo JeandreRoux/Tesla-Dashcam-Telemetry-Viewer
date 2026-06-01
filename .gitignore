@@ -3,6 +3,23 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Mac files
+.DS_Store
+
+# Local dashcam inputs/outputs
+input/
+inputs/
+output/
+outputs/
+TeslaCam_*.mp4
+*-generated_sei.csv
+
+# Raw media files can be large and may contain private footage.
+*.mp4
+*.mov
+*.avi
+*.mkv
+
 # C extensions
 *.so
 

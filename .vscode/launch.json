@@ -5,13 +5,13 @@
             "name": "Debug Tesla Project",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/project.py",
+            "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "args": [
                 "-i",
-                "C:\\Users\\Jeandre\\Documents\\TeslaCam\\Input",
+                "${workspaceFolder}/input",
                 "-o",
-                "C:\\Users\\Jeandre\\Documents\\TeslaCam\\Output"
+                "${workspaceFolder}/output"
             ]
         },
         {
