@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_qt():
-    from PySide6.QtCore import QObject, QThread, Qt, QUrl, Signal, Slot
+    from PySide6.QtCore import QDir, QObject, QThread, Qt, QUrl, Signal, Slot
     from PySide6.QtGui import QDesktopServices, QFont
     from PySide6.QtWidgets import (
         QApplication,
@@ -45,6 +45,7 @@ def _load_qt():
     )
 
     return {
+        "QDir": QDir,
         "QObject": QObject,
         "QThread": QThread,
         "Qt": Qt,
@@ -75,6 +76,7 @@ def _load_qt():
 
 
 def create_main_window(qt: dict[str, object]):
+    QDir = qt["QDir"]
     QObject = qt["QObject"]
     QThread = qt["QThread"]
     Qt = qt["Qt"]
@@ -150,12 +152,14 @@ def create_main_window(qt: dict[str, object]):
             self._build_ui()
             self._apply_styles()
             if input_path:
-                self.input_edit.setText(input_path)
+                self.input_edit.setText(self._native_path_text(input_path))
             if output_path:
-                self.output_edit.setText(output_path)
+                self.output_edit.setText(self._native_path_text(output_path))
             elif input_path:
-                self.output_edit.setText(str(ui_helpers.default_output_folder(input_path)))
+                self.output_edit.setText(self._native_path_text(ui_helpers.default_output_folder(input_path)))
             self._sync_buttons()
+            if input_path:
+                self._scan_selected_input()
 
         def _build_ui(self):
             root = QWidget()
@@ -224,15 +228,12 @@ def create_main_window(qt: dict[str, object]):
             main_layout.addWidget(options_group)
 
             actions = QHBoxLayout()
-            self.scan_button = QPushButton("Scan / Preflight")
-            self.scan_button.clicked.connect(self.scan)
             self.render_button = QPushButton("Render")
             self.render_button.setObjectName("PrimaryButton")
             self.render_button.clicked.connect(self.render)
             self.open_output_button = QPushButton("Open output folder")
             self.open_output_button.clicked.connect(self.open_output_folder)
             self.open_output_button.setEnabled(False)
-            actions.addWidget(self.scan_button)
             actions.addWidget(self.render_button)
             actions.addWidget(self.open_output_button)
             actions.addStretch(1)
@@ -240,7 +241,7 @@ def create_main_window(qt: dict[str, object]):
 
             self.progress = QProgressBar()
             self.progress.setRange(0, 100)
-            self.status_label = QLabel("Ready. Choose folders, then scan before rendering.")
+            self.status_label = QLabel("Ready. Choose an input folder; the app will scan it automatically.")
             main_layout.addWidget(self.progress)
             main_layout.addWidget(self.status_label)
 
@@ -252,6 +253,7 @@ def create_main_window(qt: dict[str, object]):
 
             self.setCentralWidget(root)
             self.input_edit.textChanged.connect(self._on_input_changed)
+            self.input_edit.editingFinished.connect(self._scan_selected_input)
             self.output_edit.textChanged.connect(self._sync_buttons)
 
         def _apply_styles(self):
@@ -287,14 +289,15 @@ def create_main_window(qt: dict[str, object]):
         def _choose_input(self):
             folder = QFileDialog.getExistingDirectory(self, "Choose input folder", self.input_edit.text() or str(Path.home()))
             if folder:
-                self.input_edit.setText(folder)
+                self.input_edit.setText(self._native_path_text(folder))
                 if not self.output_edit.text().strip():
-                    self.output_edit.setText(str(ui_helpers.default_output_folder(folder)))
+                    self.output_edit.setText(self._native_path_text(ui_helpers.default_output_folder(folder)))
+                self._scan_selected_input()
 
         def _choose_output(self):
             folder = QFileDialog.getExistingDirectory(self, "Choose output folder", self.output_edit.text() or str(Path.home()))
             if folder:
-                self.output_edit.setText(folder)
+                self.output_edit.setText(self._native_path_text(folder))
 
         def _update_layout_diagram(self, label: str):
             self.diagram_label.setText(ui_helpers.layout_diagram(ui_helpers.layout_for_display_name(label)))
@@ -302,17 +305,34 @@ def create_main_window(qt: dict[str, object]):
         def _append_log(self, message: str):
             self.log_panel.append(message)
 
+        def _native_path_text(self, path: Path | str) -> str:
+            return QDir.toNativeSeparators(str(path))
+
+        def _path_from_edit(self, text: str) -> Path:
+            return Path(QDir.fromNativeSeparators(text.strip()))
+
         def _on_input_changed(self):
             self._last_scan = None
             self.open_output_button.setEnabled(False)
-            self.status_label.setText("Input changed. Run Scan / Preflight before rendering.")
+            self.status_label.setText("Input changed. Scanning will run automatically when the folder is selected.")
             self._sync_buttons()
+
+        def _scan_selected_input(self):
+            if self._thread is not None:
+                return
+            if not self.input_edit.text().strip():
+                self._sync_buttons()
+                return
+            if not self.output_edit.text().strip():
+                self.output_edit.setText(self._native_path_text(ui_helpers.default_output_folder(self.input_edit.text().strip())))
+            self.log_panel.clear()
+            self._last_scan = None
+            self._start_worker("scan")
 
         def _sync_buttons(self):
             busy = self._thread is not None
             has_input = bool(self.input_edit.text().strip())
             has_output = bool(self.output_edit.text().strip())
-            self.scan_button.setEnabled(has_input and not busy)
             self.render_button.setEnabled(has_input and has_output and not busy and bool(self._last_scan and self._last_scan.is_ready))
 
         def _set_busy(self, busy: bool, status: str):
@@ -323,9 +343,9 @@ def create_main_window(qt: dict[str, object]):
             self._sync_buttons()
 
         def _start_worker(self, action: str):
-            input_path = Path(self.input_edit.text().strip())
+            input_path = self._path_from_edit(self.input_edit.text())
             output_text = self.output_edit.text().strip()
-            output_path = Path(output_text) if output_text else None
+            output_path = self._path_from_edit(output_text) if output_text else None
             self._thread = QThread(self)
             self._worker = Worker(action, input_path, output_path, self._options())
             self._worker.moveToThread(self._thread)
@@ -384,8 +404,9 @@ def create_main_window(qt: dict[str, object]):
             self._last_output_path = result.output_path.parent
             self.open_output_button.setEnabled(True)
             self.progress.setValue(100)
-            self.status_label.setText(f"Render complete: {result.output_path}")
-            self._append_log(f"Render complete: {result.output_path}")
+            output_text = self._native_path_text(result.output_path)
+            self.status_label.setText(f"Render complete: {output_text}")
+            self._append_log(f"Render complete: {output_text}")
 
         def _on_failed(self, message: str):
             self.progress.setRange(0, 100)
@@ -395,7 +416,7 @@ def create_main_window(qt: dict[str, object]):
             QMessageBox.warning(self, APP_NAME, message)
 
         def open_output_folder(self):
-            folder = self._last_output_path or Path(self.output_edit.text().strip() or Path.home())
+            folder = self._last_output_path or self._path_from_edit(self.output_edit.text() or str(Path.home()))
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     return MainWindow
