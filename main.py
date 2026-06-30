@@ -9,18 +9,15 @@ Usage:
     python main.py -i <input_dir> -o <output_dir> [--no-overlay] [--mph] [--preview] [--keep-csv]
 """
 
+import argparse
 import sys
 from pathlib import Path
-import argparse
 
-# Import modules
-from modules import data_handler
-from modules import video_processor
-from modules import layouts
-from modules.settings import RenderSettings
+from modules import app_service
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="TeslaCam Telemetry",
         description="Processes TeslaCam footage and telemetry data to create a multi-camera overlay video with real-time vehicle telemetry information including speed, autopilot state, steering angle, and pedal positions.",
@@ -47,93 +44,34 @@ def main():
         help="keep generated telemetry csv in input directory",
         action="store_true",
     )
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
-    settings = RenderSettings(
+    settings = app_service.build_render_settings(
         no_overlay=args.no_overlay,
         mph=args.mph,
         preview=args.preview,
         keep_csv=args.keep_csv,
-        layout=layouts.FOUR_CAMERA_DEFAULT,
     )
 
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    if not input_path.is_dir():
-        sys.exit(f"Input path '{input_path}' is not a directory.")
+    scan_result = app_service.scan_input_folder(input_path, settings)
+    print(app_service.format_scan_summary(scan_result))
+    if scan_result.errors:
+        sys.exit("Preflight scan failed.")
 
-    video_data = {}
-
-    try:
-        video_data = data_handler.compile_video_data(input_path, settings)
-        try:
-            settings.layout = layouts.select_default_layout(video_data)
-        except ValueError as error:
-            sys.exit(str(error))
-        print(f"Selected layout: {settings.layout['name']}")
-        data_handler.validate_camera_data(video_data, settings.layout)
-        data_handler.validate_telemetry_data(settings, video_data, input_path)
-
-        first_timestamp, fps = video_processor.get_video_fps(input_path, video_data)
-
-        if settings.no_overlay:
-            output_filename = f"TeslaCam_{first_timestamp}_no-overlay"
-        else:
-            output_filename = f"TeslaCam_{first_timestamp}"
-
-        out, output_filepath = video_processor.create_video_writer(
-            output_path=output_path,
-            output_filename=output_filename,
-            fps=fps,
-        )
-
-        try:
-            for timestamp in sorted(video_data.keys()):
-                telemetry_df = None
-
-                captures = video_processor.open_captures(
-                    input_path=input_path,
-                    files_info=video_data[timestamp],
-                    layout=settings.layout,
-                )
-
-                try:
-                    total_frames = video_processor.get_total_frames(
-                        captures,
-                        settings.layout,
-                    )
-
-                    data_file = video_data[timestamp].get("data")
-                    if data_file:
-                        telemetry_df = data_handler.load_telemetry_data(
-                            input_path=input_path,
-                            data_file=data_file,
-                            total_frames=total_frames,
-                            settings=settings,
-                        )
-
-                    if settings.preview:
-                        print("Loading preview... press 'q' to quit.")
-                        print("Processing videos...")
-                    else:
-                        print("Processing videos...")
-
-                    video_processor.process_video(
-                        captures=captures,
-                        telemetry_df=telemetry_df,
-                        out=out,
-                        settings=settings,
-                    )
-                finally:
-                    video_processor.release_captures(captures)
-
-            print(f"Finished all clips. Released final video file: {output_filepath}")
-        finally:
-            out.release()
-            video_processor.close_preview_windows()
-    finally:
-        data_handler.remove_generated_csv(input_path, video_data, settings)
+    job = app_service.RenderJob(
+        input_path=input_path,
+        output_path=output_path,
+        settings=settings,
+    )
+    app_service.render_video(job)
 
 
 if __name__ == "__main__":

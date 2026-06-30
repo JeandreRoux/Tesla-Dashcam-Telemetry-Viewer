@@ -1,3 +1,5 @@
+from typing import Callable
+
 import cv2 as cv
 import numpy as np
 import sys
@@ -104,8 +106,14 @@ def process_video(
     telemetry_df: pd.DataFrame | None,
     out: cv.VideoWriter,
     settings: RenderSettings,
-) -> None:
-    """Render frames from the selected layout and write them to the output video."""
+    progress_callback: Callable[[int], None] | None = None,
+) -> int:
+    """Render frames from the selected layout and write them to the output video.
+
+    Returns the number of frames written. ``progress_callback`` receives the
+    one-based frame count after each written frame so GUI callers can update
+    progress without parsing stdout.
+    """
 
     frame_index = 0
 
@@ -117,7 +125,7 @@ def process_video(
         for camera_key in settings.layout["required_cameras"]:
             ret, frame = captures[camera_key].read()
             if not ret:
-                return
+                return frame_index
             frames[camera_key] = frame
 
         # Get current frame index
@@ -145,6 +153,8 @@ def process_video(
 
         # write frame
         out.write(canvas)
+        if progress_callback is not None:
+            progress_callback(frame_index)
 
 
 def release_captures(captures: dict[str, cv.VideoCapture]) -> None:
