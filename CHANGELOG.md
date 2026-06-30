@@ -8,6 +8,24 @@ This project follows semantic versioning where practical.
 
 - No unreleased changes yet.
 
+## [0.2.0] - 2026-06-30
+
+### Added
+
+- Six-camera TeslaCam support for `left_pillar` and `right_pillar` clips.
+- Automatic default layout selection for complete four-camera or six-camera clip sets.
+- Default six-camera 3x2 grid layout.
+- Tests for six-camera layout selection and camera reference preference.
+
+### Changed
+
+- README documents four-camera and six-camera input file sets.
+- README documents package update and uninstall commands.
+
+### Fixed
+
+- Mixed or incomplete camera sets now fail with a clear error instead of silently rendering an unexpected layout.
+
 ## [0.1.0] - 2026-06-30
 
 ### Added
@@ -24,5 +42,6 @@ This project follows semantic versioning where practical.
 - Bundled font/resource loading so the installed command works outside the repository directory.
 - Python support metadata aligned to Python 3.11+ based on pinned dependency compatibility.
 
-[Unreleased]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JeandreRoux/teslacam-telemetry/releases/tag/v0.1.0
