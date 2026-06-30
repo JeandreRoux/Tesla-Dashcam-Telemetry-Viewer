@@ -6,6 +6,9 @@ __pycache__/
 # Mac files
 .DS_Store
 
+# Local coding-agent instructions
+AGENTS.md
+
 # Local dashcam inputs/outputs
 input/
 inputs/

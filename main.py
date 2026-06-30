@@ -67,6 +67,11 @@ def main():
 
     try:
         video_data = data_handler.compile_video_data(input_path, settings)
+        try:
+            settings.layout = layouts.select_default_layout(video_data)
+        except ValueError as error:
+            sys.exit(str(error))
+        print(f"Selected layout: {settings.layout['name']}")
         data_handler.validate_camera_data(video_data, settings.layout)
         data_handler.validate_telemetry_data(settings, video_data, input_path)
 

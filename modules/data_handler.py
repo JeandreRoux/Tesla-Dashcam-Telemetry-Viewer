@@ -1,3 +1,5 @@
+from typing import Mapping
+
 import re
 import sys
 import pandas as pd
@@ -8,9 +10,9 @@ from modules import sei_extractor
 from modules import layouts
 from modules.settings import RenderSettings
 
-CAMERA_KEYS = ("front", "back", "left_repeater", "right_repeater")
+CAMERA_KEYS = layouts.ALL_CAMERA_KEYS
 
-DEFAULT_REQUIRED_CAMERAS = CAMERA_KEYS
+DEFAULT_REQUIRED_CAMERAS = layouts.FOUR_CAMERA_KEYS
 
 REQUIRED_TELEMETRY_COLUMNS = (
     "gear_state",
@@ -60,9 +62,9 @@ def compile_video_data(input_path: Path, settings: RenderSettings) -> VideoData:
     return video_data
 
 
-def get_available_video_file(files_info: ClipFiles) -> str | None:
+def get_available_video_file(files_info: Mapping[str, str | None]) -> str | None:
     """Return the first available video filename in camera preference order."""
-    for camera_key in CAMERA_KEYS:
+    for camera_key in layouts.CAMERA_REFERENCE_PREFERENCE:
         video_file = files_info.get(camera_key)
         if video_file:
             return video_file
