@@ -114,13 +114,6 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 ## Usage
 
 1. **Run the app**
-
-   Existing script workflow:
-   ```bash
-   python main.py --input /path/to/teslacam/clips --output /path/to/save/video
-   ```
-
-   Installed command workflow:
    ```bash
    teslacam-telemetry --input /path/to/teslacam/clips --output /path/to/save/video
    ```
