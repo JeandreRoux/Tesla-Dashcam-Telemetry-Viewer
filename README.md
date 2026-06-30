@@ -53,23 +53,14 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    ```
 
 4. **Install the app**:
-
-   Existing requirements-based workflow:
-   ```bash
-   python -m pip install -r requirements.txt
-   python main.py --help
-   ```
-
-   Editable package workflow for development:
-   ```bash
-   python -m pip install -e .
-   teslacam-telemetry --help
-   ```
-
-   Package install workflow:
    ```bash
    python -m pip install .
    teslacam-telemetry --help
+   ```
+
+   For development, install in editable mode instead:
+   ```bash
+   python -m pip install -e .
    ```
 
 5. **Install FFmpeg (if needed)**:
