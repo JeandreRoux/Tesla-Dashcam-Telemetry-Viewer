@@ -1,13 +1,21 @@
+from importlib import resources
+
 from PIL import ImageFont
+
+
+def font_path(filename: str) -> str:
+    """Return the installed path for a bundled font file."""
+    return str(resources.files("utils").joinpath("fonts", filename))
+
 
 OVERLAY_BG_COLOR = (0, 0, 0, 220)
 CIRCLE_BG_COLOR = (50, 50, 50, 245)
 FONT_WHITE = (255, 255, 255)
 FONT_BLUE = (19, 121, 227)
-FONT_SPEED = ImageFont.truetype("utils/fonts/arial.ttf", 32)
-FONT_SPEED_UNIT = ImageFont.truetype("utils/fonts/arialbd.ttf", 14)
-FONT_AUTOPILOT = ImageFont.truetype("utils/fonts/arialbd.ttf", 14)
-FONT_GEAR = ImageFont.truetype("utils/fonts/arialbd.ttf", 16)
+FONT_SPEED = ImageFont.truetype(font_path("arial.ttf"), 32)
+FONT_SPEED_UNIT = ImageFont.truetype(font_path("arialbd.ttf"), 14)
+FONT_AUTOPILOT = ImageFont.truetype(font_path("arialbd.ttf"), 14)
+FONT_GEAR = ImageFont.truetype(font_path("arialbd.ttf"), 16)
 BLINKER_OFF = (0, 102, 41, 220)
 BLINKER_ON = (0, 194, 78, 250)
 PEDAL_ACTIVE = (255, 255, 255, 250)

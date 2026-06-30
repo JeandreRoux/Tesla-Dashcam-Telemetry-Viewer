@@ -52,9 +52,24 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    .venv\Scripts\activate
    ```
 
-4. **Install dependencies**:
+4. **Install the app**:
+
+   Existing requirements-based workflow:
    ```bash
    python -m pip install -r requirements.txt
+   python main.py --help
+   ```
+
+   Editable package workflow for development:
+   ```bash
+   python -m pip install -e .
+   teslacam-telemetry --help
+   ```
+
+   Package install workflow:
+   ```bash
+   python -m pip install .
+   teslacam-telemetry --help
    ```
 
 5. **Install FFmpeg (if needed)**:
@@ -107,10 +122,17 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 
 ## Usage
 
-1. **Run the script**
-```bash
-python main.py --input /path/to/teslacam/clips --output /path/to/save/video
-```
+1. **Run the app**
+
+   Existing script workflow:
+   ```bash
+   python main.py --input /path/to/teslacam/clips --output /path/to/save/video
+   ```
+
+   Installed command workflow:
+   ```bash
+   teslacam-telemetry --input /path/to/teslacam/clips --output /path/to/save/video
+   ```
 
 2. **Optional Arguments**
 * `--no-overlay`: Disables the telemetry overlay and only produces the multi-camera stitched video.
