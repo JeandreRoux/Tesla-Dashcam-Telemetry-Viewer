@@ -29,19 +29,21 @@ dependencies = [
     "pandas==3.0.0",
     "pillow==12.1.1",
     "protobuf==7.34.1",
+    "PySide6==6.10.1",
     "python-dateutil==2.9.0.post0",
     "six==1.17.0",
 ]
 
 [project.scripts]
 teslacam-telemetry = "main:main"
+teslacam-telemetry-ui = "desktop_ui:main"
 
 [project.urls]
 Homepage = "https://github.com/JeandreRoux/teslacam-telemetry"
 Issues = "https://github.com/JeandreRoux/teslacam-telemetry/issues"
 
 [tool.setuptools]
-py-modules = ["main"]
+py-modules = ["main", "desktop_ui"]
 packages = ["modules", "utils", "utils.fonts"]
 
 [tool.setuptools.package-data]
