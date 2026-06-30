@@ -95,7 +95,7 @@ def get_total_frames(
     layout: layouts.LayoutConfig,
 ) -> int:
     """Return the frame count from the layout's reference camera."""
-    reference_camera = layout["required_cameras"][0]
+    reference_camera = layouts.get_reference_camera(layout)
     return int(captures[reference_camera].get(cv.CAP_PROP_FRAME_COUNT))
 
 
@@ -109,7 +109,7 @@ def process_video(
 
     frame_index = 0
 
-    reference_camera = settings.layout["required_cameras"][0]
+    reference_camera = layouts.get_reference_camera(settings.layout)
 
     while True:
         frames = {}

@@ -33,6 +33,16 @@ class TestGetAvailableVideoFile(unittest.TestCase):
 
         self.assertEqual(video_file, "back.mp4")
 
+    def test_prefers_front_when_pillar_camera_is_available(self):
+        files_info = {
+            "left_pillar": "left_pillar.mp4",
+            "front": "front.mp4",
+        }
+
+        video_file = get_available_video_file(files_info)
+
+        self.assertEqual(video_file, "front.mp4")
+
     def test_returns_none_when_no_video_files_exist(self):
         files_info = {
             "data": "telemetry.csv",

@@ -7,7 +7,7 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 ---
 
 ## Features
-* **Multi-cam Sync**: Automatically stitches Front, Rear, and Side Repeater clips into a single frame.
+* **Multi-cam Sync**: Automatically stitches four-camera and six-camera TeslaCam clips into a single frame.
 * **Batch Processing**: Ability to add multiple sets of clips to be processed into one large video automatically in order of timestamp.
 * **Telemetry Overlay**: Real-time visualization of:
 	* Speed
@@ -82,7 +82,9 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 
 ## Input Files
 
-The default layout requires all four Tesla dashcam camera files for each timestamp:
+The app auto-detects the available TeslaCam camera set and selects the matching default layout.
+
+Four-camera set:
 
 ```text
 YYYY-MM-DD_HH-MM-SS-front.mp4
@@ -90,6 +92,15 @@ YYYY-MM-DD_HH-MM-SS-back.mp4
 YYYY-MM-DD_HH-MM-SS-left_repeater.mp4
 YYYY-MM-DD_HH-MM-SS-right_repeater.mp4
 ```
+
+Six-camera set additionally includes the pillar cameras:
+
+```text
+YYYY-MM-DD_HH-MM-SS-left_pillar.mp4
+YYYY-MM-DD_HH-MM-SS-right_pillar.mp4
+```
+
+Each timestamp in a batch must use the same complete camera set. Mixed four-camera and six-camera batches are rejected so the output layout does not change mid-video.
 
 Telemetry can be read from embedded SEI data when available. You can also provide a matching CSV manually:
 
@@ -132,9 +143,7 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 * **Location Info**: Show heading and GPS coordinates, with room for future mapping features.
 
 ## Known Limitations
-* The current renderer supports the default four-camera layout only.
-* The default layout requires all four camera files for each timestamp.
-* Additional B-pillar camera files from HW4 vehicles are not currently supported, but support is planned.
+* Mixed four-camera and six-camera batches are not rendered together in one output; each batch must use one complete camera set.
 * Telemetry overlays depend on SEI metadata or a matching CSV file being available.
 * Some clips may contain missing or partial telemetry, especially when the car is parked.
 * MP4 output depends on OpenCV having working codec support on your system.
