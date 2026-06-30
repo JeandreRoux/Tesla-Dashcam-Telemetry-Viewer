@@ -29,8 +29,18 @@ ClipFiles = dict[str, str | None]
 VideoData = dict[str, ClipFiles]
 
 
-def compile_video_data(input_path: Path, settings: RenderSettings) -> VideoData:
-    """Build clip groups from Tesla dashcam filenames in the input directory."""
+def compile_video_data(
+    input_path: Path,
+    settings: RenderSettings,
+    *,
+    generate_missing_telemetry: bool = True,
+) -> VideoData:
+    """Build clip groups from Tesla dashcam filenames in the input directory.
+
+    By default this preserves the CLI behavior of generating missing telemetry CSV
+    files from embedded SEI data. UI/preflight callers can disable that side
+    effect by passing ``generate_missing_telemetry=False``.
+    """
     pattern = re.compile(
         r"([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})-([a-z_]+)\.(mp4|csv)"
     )
@@ -56,7 +66,7 @@ def compile_video_data(input_path: Path, settings: RenderSettings) -> VideoData:
                 print(f"Found telemetry CSV: {video_data[timestamp]['data']}")
             else:
                 video_data[timestamp][file_id] = item.name
-    if not settings.no_overlay:
+    if generate_missing_telemetry and not settings.no_overlay:
         video_data = generate_sei_data(video_data, input_path, settings)
 
     return video_data
@@ -116,16 +126,12 @@ def telemetry_csv_is_valid(csv_path: Path) -> bool:
     return all(column in df.columns for column in REQUIRED_TELEMETRY_COLUMNS)
 
 
-def validate_camera_data(
+def get_missing_camera_groups(
     video_data: VideoData,
     layout: layouts.LayoutConfig,
-) -> None:
-    """Exit if any clip group is missing cameras required by the selected layout."""
-    if not video_data:
-        sys.exit("No Tesla dashcam files found in the input directory.")
-
+) -> list[tuple[str, list[str]]]:
+    """Return timestamps and camera keys missing from the selected layout."""
     required_cameras = layout["required_cameras"]
-
     invalid_timestamps = []
 
     for timestamp, files_info in video_data.items():
@@ -138,6 +144,19 @@ def validate_camera_data(
         if missing_cameras:
             invalid_timestamps.append((timestamp, missing_cameras))
 
+    return invalid_timestamps
+
+
+def validate_camera_data(
+    video_data: VideoData,
+    layout: layouts.LayoutConfig,
+) -> None:
+    """Exit if any clip group is missing cameras required by the selected layout."""
+    if not video_data:
+        sys.exit("No Tesla dashcam files found in the input directory.")
+
+    invalid_timestamps = get_missing_camera_groups(video_data, layout)
+
     if invalid_timestamps:
         print("The following timestamps are missing required camera files:")
         for timestamp, missing_cameras in invalid_timestamps:
@@ -147,15 +166,11 @@ def validate_camera_data(
         sys.exit("Processing aborted due to missing camera files.")
 
 
-def validate_telemetry_data(
-    settings: RenderSettings,
+def get_invalid_telemetry_groups(
     video_data: VideoData,
     input_path: Path,
-) -> None:
-    """Validate telemetry files and prompt to continue without overlays if needed."""
-    if settings.no_overlay:
-        return
-
+) -> list[tuple[str, str]]:
+    """Return timestamps where telemetry CSV data is missing or invalid."""
     invalid_data_timestamps = []
 
     for timestamp, files_info in video_data.items():
@@ -171,6 +186,20 @@ def validate_telemetry_data(
             invalid_data_timestamps.append(
                 (timestamp, f"invalid telemetry CSV: {data_file}")
             )
+
+    return invalid_data_timestamps
+
+
+def validate_telemetry_data(
+    settings: RenderSettings,
+    video_data: VideoData,
+    input_path: Path,
+) -> None:
+    """Validate telemetry files and prompt to continue without overlays if needed."""
+    if settings.no_overlay:
+        return
+
+    invalid_data_timestamps = get_invalid_telemetry_groups(video_data, input_path)
 
     if invalid_data_timestamps:
         print("Telemetry data could not be used for the following timestamps:")
