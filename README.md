@@ -56,6 +56,7 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    ```bash
    python -m pip install .
    teslacam-telemetry --help
+   teslacam-telemetry-ui --help
    ```
 
    To update an existing normal install after pulling new code:
@@ -63,6 +64,7 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    git pull
    python -m pip install --upgrade .
    teslacam-telemetry --help
+   teslacam-telemetry-ui --help
    ```
 
    To uninstall the app:
@@ -136,6 +138,39 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 
 ## Usage
 
+### Desktop app
+
+For most users, the desktop app is the easiest way to render TeslaCam footage:
+
+```bash
+teslacam-telemetry-ui
+```
+
+The desktop app provides a simple workflow:
+
+1. Choose the TeslaCam input folder containing the camera MP4 files.
+2. The app automatically scans the folder and detects the camera set.
+3. Choose an output folder.
+4. Select render options:
+   * **Telemetry overlay**: Adds speed, gear, steering, pedal, and driving-state data when telemetry is available.
+   * **Use MPH**: Shows speed in MPH instead of KM/H.
+   * **Keep generated CSV**: Keeps telemetry CSV files generated from embedded SEI metadata.
+5. Click **Render**.
+6. When rendering completes, click **Open output folder** to view the finished video.
+
+The app currently auto-selects the default layout based on the detected camera set:
+
+* **Four-camera standard** for front, back, left repeater, and right repeater clips.
+* **Six-camera grid** for front, back, repeaters, and pillar-camera clips.
+
+You can also prefill folders from the command line:
+
+```bash
+teslacam-telemetry-ui --input /path/to/teslacam/clips --output /path/to/save/video
+```
+
+### Command line
+
 1. **Run the app**
    ```bash
    teslacam-telemetry --input /path/to/teslacam/clips --output /path/to/save/video
@@ -150,7 +185,7 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 ## Future Roadmap
 * **Layout Presets**: Choose from focused, grid, and single-camera export layouts.
 * **Camera Selection**: Include only the camera angles needed for each output.
-* **Desktop App**: Provide a graphical interface for selecting clips, configuring exports, and previewing results.
+* **Windows Executable**: Provide a packaged `.exe` so non-technical users do not need to install Python manually.
 * **G-Force Indicator**: Visualize acceleration, braking, and cornering forces from embedded accelerometer telemetry.
 * **Location Info**: Show heading and GPS coordinates, with room for future mapping features.
 
