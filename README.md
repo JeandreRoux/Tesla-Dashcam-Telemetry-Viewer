@@ -58,6 +58,18 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    teslacam-telemetry --help
    ```
 
+   To update an existing normal install after pulling new code:
+   ```bash
+   git pull
+   python -m pip install --upgrade .
+   teslacam-telemetry --help
+   ```
+
+   To uninstall the app:
+   ```bash
+   python -m pip uninstall teslacam-telemetry
+   ```
+
    For development, install in editable mode instead:
    ```bash
    python -m pip install -e .
