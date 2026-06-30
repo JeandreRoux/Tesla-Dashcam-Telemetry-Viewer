@@ -1,6 +1,6 @@
-# Tesla Dashcam Telemetry Viewer
+# TeslaCam Telemetry
 
-Processes Tesla dashcam MP4 files and accompanying CSV telemetry files to produce a combined multi-camera video with real-time telemetry overlay.
+Processes TeslaCam MP4 files and accompanying CSV telemetry files to produce a combined multi-camera video with real-time telemetry overlay.
 
 This is an unofficial community project and is not affiliated with, endorsed by, or supported by Tesla.
 
@@ -24,15 +24,15 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 
 
 ## Prerequisites
-1. **Python 3.10+**: Check version with `python --version` in a terminal window.
+1. **Python 3.11+**: Check version with `python --version` in a terminal window.
 2. **MP4 codec support**: OpenCV needs MP4 encoding support to write the output video. Installing FFmpeg is recommended if MP4 output fails.
 
 ## Installation
 
 1. **Clone this repository**:
    ```bash
-   git clone https://github.com/JeandreRoux/tesla-dashcam-telemetry-viewer.git
-   cd tesla-dashcam-telemetry-viewer
+   git clone https://github.com/JeandreRoux/teslacam-telemetry.git
+   cd teslacam-telemetry
    ```
 
 2. **Create a virtual environment**:
@@ -52,9 +52,15 @@ This is an unofficial community project and is not affiliated with, endorsed by,
    .venv\Scripts\activate
    ```
 
-4. **Install dependencies**:
+4. **Install the app**:
    ```bash
-   python -m pip install -r requirements.txt
+   python -m pip install .
+   teslacam-telemetry --help
+   ```
+
+   For development, install in editable mode instead:
+   ```bash
+   python -m pip install -e .
    ```
 
 5. **Install FFmpeg (if needed)**:
@@ -107,10 +113,10 @@ You can also disable dashcam encryption in the vehicle under `Controls > Safety 
 
 ## Usage
 
-1. **Run the script**
-```bash
-python main.py --input /path/to/teslacam/clips --output /path/to/save/video
-```
+1. **Run the app**
+   ```bash
+   teslacam-telemetry --input /path/to/teslacam/clips --output /path/to/save/video
+   ```
 
 2. **Optional Arguments**
 * `--no-overlay`: Disables the telemetry overlay and only produces the multi-camera stitched video.

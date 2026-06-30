@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teslacam-telemetry"
+version = "0.1.0"
+description = "CLI tool for rendering TeslaCam videos with telemetry overlays."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Jeandre Roux" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "numpy==2.4.2",
+    "opencv-python==4.13.0.92",
+    "pandas==3.0.0",
+    "pillow==12.1.1",
+    "protobuf==7.34.1",
+    "python-dateutil==2.9.0.post0",
+    "six==1.17.0",
+]
+
+[project.scripts]
+teslacam-telemetry = "main:main"
+
+[project.urls]
+Homepage = "https://github.com/JeandreRoux/teslacam-telemetry"
+Issues = "https://github.com/JeandreRoux/teslacam-telemetry/issues"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["modules", "utils"]
+
+[tool.setuptools.package-data]
+utils = ["fonts/*.ttf", "*.proto"]
