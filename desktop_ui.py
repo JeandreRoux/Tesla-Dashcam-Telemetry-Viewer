@@ -148,6 +148,7 @@ def create_main_window(qt: dict[str, object]):
             self._last_scan = None
             self._last_output_path: Path | None = None
             self._codec_warning_shown = False
+            self._mp4_output_supported = True
             self.setWindowTitle(APP_NAME)
             self.resize(960, 720)
             self._build_ui()
@@ -312,7 +313,10 @@ def create_main_window(qt: dict[str, object]):
             self._last_scan = None
             self.open_output_button.setEnabled(False)
             self._show_layout_placeholder()
-            self.status_label.setText("Press Enter to check the input folder.")
+            if self._mp4_output_supported:
+                self.status_label.setText("Press Enter to check the input folder.")
+            else:
+                self.status_label.setText("Install FFmpeg, then restart the app.")
             self._sync_buttons()
 
         def _scan_selected_input(self):
@@ -331,15 +335,25 @@ def create_main_window(qt: dict[str, object]):
             busy = self._thread is not None
             has_input = bool(self.input_edit.text().strip())
             has_output = bool(self.output_edit.text().strip())
-            self.render_button.setEnabled(has_input and has_output and not busy and bool(self._last_scan and self._last_scan.is_ready))
+            self.render_button.setEnabled(
+                self._mp4_output_supported
+                and has_input
+                and has_output
+                and not busy
+                and bool(self._last_scan and self._last_scan.is_ready)
+            )
 
         def _show_codec_warning_if_needed(self):
             if self._codec_warning_shown:
                 return
             codec_check = app_service.check_mp4_output_support()
             if codec_check.is_supported:
+                self._mp4_output_supported = True
                 return
+            self._mp4_output_supported = False
             self._codec_warning_shown = True
+            self.status_label.setText("Install FFmpeg, then restart the app.")
+            self._sync_buttons()
             self._append_log(codec_check.message)
             dialog = QMessageBox(self)
             dialog.setIcon(QMessageBox.Icon.Warning)
@@ -426,7 +440,10 @@ def create_main_window(qt: dict[str, object]):
                 self._show_layout_placeholder()
             summary = ui_helpers.format_scan_summary_for_ui(scan_result)
             self._append_log(summary)
-            self.status_label.setText("Ready to render." if scan_result.is_ready else "Check the details before rendering.")
+            if self._mp4_output_supported:
+                self.status_label.setText("Ready to render." if scan_result.is_ready else "Check the details before rendering.")
+            else:
+                self.status_label.setText("Install FFmpeg, then restart the app.")
             self.progress.setRange(0, 100)
             self.progress.setValue(0)
 

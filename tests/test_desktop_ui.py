@@ -121,7 +121,23 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertIn("Open PowerShell or Command Prompt", warnings[0][1])
         self.assertIn("winget install ffmpeg", warnings[0][1])
         self.assertIn("#10141f", warnings[0][2])
+        self.assertEqual(window.status_label.text(), "Install FFmpeg, then restart the app.")
+        self.assertFalse(window.render_button.isEnabled())
         self.assertIn("winget install ffmpeg", window.log_panel.toPlainText())
+
+        window.input_edit.setText("/input")
+        window.output_edit.setText("/output")
+        scan = app_service.ScanResult(
+            input_path=Path("/input"),
+            layout=layouts.SIX_CAMERA_DEFAULT,
+            camera_set="six-camera",
+            clip_group_count=2,
+        )
+        window._on_scan_finished(scan)
+        window._sync_buttons()
+
+        self.assertEqual(window.status_label.text(), "Install FFmpeg, then restart the app.")
+        self.assertFalse(window.render_button.isEnabled())
 
 
 def patch_supported_codec():
