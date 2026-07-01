@@ -341,7 +341,29 @@ def create_main_window(qt: dict[str, object]):
                 return
             self._codec_warning_shown = True
             self._append_log(codec_check.message)
-            QMessageBox.warning(self, "MP4 video support is missing", codec_check.message)
+            dialog = QMessageBox(self)
+            dialog.setIcon(QMessageBox.Icon.Warning)
+            dialog.setWindowTitle("MP4 video support is missing")
+            dialog.setText(codec_check.message)
+            dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            dialog.setStyleSheet(self._message_box_stylesheet())
+            dialog.exec()
+
+        def _message_box_stylesheet(self) -> str:
+            return """
+                QMessageBox { background: #10141f; }
+                QMessageBox QLabel { color: #ecf2ff; font-size: 14px; }
+                QMessageBox QPushButton {
+                    color: #ecf2ff;
+                    background: #2c7be5;
+                    border: 1px solid #4390ff;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    min-width: 84px;
+                    font-weight: 700;
+                }
+                QMessageBox QPushButton:hover { background: #3d8cf6; }
+            """
 
         def _set_busy(self, busy: bool, status: str):
             self.status_label.setText(status)

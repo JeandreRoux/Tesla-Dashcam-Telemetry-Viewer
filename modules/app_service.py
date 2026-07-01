@@ -154,11 +154,11 @@ def format_mp4_codec_error(
 def _ffmpeg_install_instructions(platform_name: str) -> str:
     system = platform_name.lower()
     if system == "windows":
-        return "Windows: winget install ffmpeg"
+        return "Open PowerShell or Command Prompt and run:\nwinget install ffmpeg"
     if system == "darwin":
-        return "macOS: brew install ffmpeg"
+        return "Open Terminal and run:\nbrew install ffmpeg"
     if system == "linux":
-        return "Linux: sudo apt update && sudo apt install ffmpeg"
+        return "Open Terminal and run:\nsudo apt update && sudo apt install ffmpeg"
     return "Install FFmpeg using the recommended package manager for your operating system."
 
 

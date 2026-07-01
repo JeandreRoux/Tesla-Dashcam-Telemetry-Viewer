@@ -73,9 +73,35 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         warnings = []
 
         class FakeMessageBox:
-            @staticmethod
-            def warning(parent, title, message):
-                warnings.append((title, message))
+            class Icon:
+                Warning = "warning"
+
+            class StandardButton:
+                Ok = "ok"
+
+            def __init__(self, parent=None):
+                self.parent = parent
+                self.title = ""
+                self.message = ""
+                self.stylesheet = ""
+
+            def setIcon(self, icon):
+                self.icon = icon
+
+            def setWindowTitle(self, title):
+                self.title = title
+
+            def setText(self, message):
+                self.message = message
+
+            def setStandardButtons(self, buttons):
+                self.buttons = buttons
+
+            def setStyleSheet(self, stylesheet):
+                self.stylesheet = stylesheet
+
+            def exec(self):
+                warnings.append((self.title, self.message, self.stylesheet))
 
         qt = dict(self.qt)
         qt["QMessageBox"] = FakeMessageBox
@@ -86,13 +112,15 @@ class TestDesktopUiLayoutState(unittest.TestCase):
             "modules.app_service.check_mp4_output_support",
             return_value=app_service.CodecCheckResult(
                 is_supported=False,
-                message="MP4 video support is missing.\n\nWindows: winget install ffmpeg",
+                message="MP4 video support is missing.\n\nOpen PowerShell or Command Prompt and run:\nwinget install ffmpeg",
             ),
         ):
             window = MainWindow()
 
         self.assertEqual(warnings[0][0], "MP4 video support is missing")
+        self.assertIn("Open PowerShell or Command Prompt", warnings[0][1])
         self.assertIn("winget install ffmpeg", warnings[0][1])
+        self.assertIn("#10141f", warnings[0][2])
         self.assertIn("winget install ffmpeg", window.log_panel.toPlainText())
 
 

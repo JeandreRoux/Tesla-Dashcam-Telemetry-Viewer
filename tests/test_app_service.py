@@ -40,6 +40,7 @@ class TestMp4CodecCheck(unittest.TestCase):
 
         self.assertFalse(result.is_supported)
         self.assertIn("MP4 video support is missing", result.message)
+        self.assertIn("Open PowerShell or Command Prompt", result.message)
         self.assertIn("winget install ffmpeg", result.message)
         self.assertIn("https://ffmpeg.org/download.html", result.message)
 

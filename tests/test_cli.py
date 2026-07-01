@@ -34,7 +34,7 @@ class TestCliMp4Preflight(unittest.TestCase):
                 "modules.app_service.check_mp4_output_support",
                 return_value=app_service.CodecCheckResult(
                     is_supported=False,
-                    message="MP4 video support is missing.\n\nWindows: winget install ffmpeg",
+                    message="MP4 video support is missing.\n\nOpen PowerShell or Command Prompt and run:\nwinget install ffmpeg",
                 ),
             ), patch("modules.app_service.scan_input_folder") as scan_input_folder:
                 with self.assertRaises(SystemExit) as raised:
