@@ -26,6 +26,32 @@ class TestBuildRenderSettings(unittest.TestCase):
         self.assertIs(settings.layout, layouts.FOUR_CAMERA_DEFAULT)
 
 
+class TestMp4CodecCheck(unittest.TestCase):
+    def test_reports_supported_codec_without_message(self):
+        with patch("modules.video_processor.can_write_mp4", return_value=True):
+            result = app_service.check_mp4_output_support(platform_name="Windows")
+
+        self.assertTrue(result.is_supported)
+        self.assertEqual(result.message, "")
+
+    def test_reports_windows_ffmpeg_instruction_when_codec_is_missing(self):
+        with patch("modules.video_processor.can_write_mp4", return_value=False):
+            result = app_service.check_mp4_output_support(platform_name="Windows")
+
+        self.assertFalse(result.is_supported)
+        self.assertIn("MP4 video support is missing", result.message)
+        self.assertIn("Open PowerShell or Command Prompt", result.message)
+        self.assertIn("winget install ffmpeg", result.message)
+        self.assertIn("https://ffmpeg.org/download.html", result.message)
+
+    def test_formats_macos_and_linux_install_instructions(self):
+        mac_message = app_service.format_mp4_codec_error(platform_name="Darwin")
+        linux_message = app_service.format_mp4_codec_error(platform_name="Linux")
+
+        self.assertIn("brew install ffmpeg", mac_message)
+        self.assertIn("sudo apt update && sudo apt install ffmpeg", linux_message)
+
+
 class TestScanInputFolder(unittest.TestCase):
     def test_returns_error_for_missing_input_directory(self):
         scan = app_service.scan_input_folder(Path("/definitely/missing"))

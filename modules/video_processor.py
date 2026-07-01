@@ -17,6 +17,32 @@ CANVAS_WIDTH = config.CANVAS_WIDTH
 CANVAS_HEIGHT = config.CANVAS_HEIGHT
 
 
+def can_write_mp4(output_path: Path) -> bool:
+    """Return True when OpenCV can create and write a small MP4 file."""
+    output_path = Path(output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+    test_file = output_path / "teslacam_telemetry_codec_check.mp4"
+    writer = cv.VideoWriter(
+        str(test_file),
+        cv.VideoWriter_fourcc(*"mp4v"),
+        1.0,
+        (16, 16),
+        isColor=True,
+    )
+    try:
+        if not writer.isOpened():
+            return False
+        frame = np.zeros((16, 16, 3), dtype=np.uint8)
+        writer.write(frame)
+    finally:
+        writer.release()
+
+    try:
+        return test_file.exists() and test_file.stat().st_size > 0
+    finally:
+        test_file.unlink(missing_ok=True)
+
+
 def get_video_fps(
     input_path: Path,
     video_data: data_handler.VideoData,
