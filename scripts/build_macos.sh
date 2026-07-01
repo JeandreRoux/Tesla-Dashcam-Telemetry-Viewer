@@ -10,10 +10,11 @@ DIST_DIR="$REPO_ROOT/dist"
 BUILD_DIR="$REPO_ROOT/build"
 APP_PATH="$DIST_DIR/TeslaCamTelemetry.app"
 ZIP_PATH="$DIST_DIR/$ARTIFACT_NAME"
+ARTIFACT_DIR="$DIST_DIR/macos-artifact"
 
 cd "$REPO_ROOT"
 
-rm -rf "$BUILD_DIR" "$APP_PATH" "$ZIP_PATH"
+rm -rf "$BUILD_DIR" "$APP_PATH" "$ZIP_PATH" "$ARTIFACT_DIR"
 
 python -m PyInstaller --noconfirm --clean "$SPEC_FILE"
 
@@ -30,4 +31,13 @@ if [[ ! -f "$ZIP_PATH" ]]; then
   exit 1
 fi
 
+mkdir -p "$ARTIFACT_DIR"
+cp -R "$APP_PATH" "$ARTIFACT_DIR/"
+
+if [[ ! -d "$ARTIFACT_DIR/TeslaCamTelemetry.app" ]]; then
+  echo "Expected workflow artifact app bundle was not staged: $ARTIFACT_DIR/TeslaCamTelemetry.app" >&2
+  exit 1
+fi
+
 echo "Created $ZIP_PATH"
+echo "Staged $ARTIFACT_DIR/TeslaCamTelemetry.app"

@@ -50,7 +50,7 @@ The macOS app is currently unsigned. macOS may show a Gatekeeper warning until s
 
 The **Windows App** workflow builds the Windows app folder on `windows-latest` and uploads it as a workflow artifact. GitHub downloads artifacts as ZIP files, so the workflow uploads the app folder directly to avoid a ZIP inside another ZIP.
 
-The **macOS App** workflow builds the macOS `.app` bundle on `macos-latest` and uploads it as a workflow artifact. The artifact is for testing the unsigned app bundle before release packaging.
+The **macOS App** workflow builds the macOS `.app` bundle on `macos-latest` and uploads it as a workflow artifact. After downloading and unzipping the artifact, you should see `TeslaCamTelemetry.app` directly, not just its inner `Contents` folder.
 
 The **Release** workflow runs when a `v*.*.*` tag is pushed. It builds the Python package, Windows portable app, and macOS portable app, then attaches them to the GitHub Release. The app release assets are named like:
 
