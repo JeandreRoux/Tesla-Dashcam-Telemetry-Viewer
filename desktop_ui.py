@@ -190,17 +190,13 @@ def create_main_window(qt: dict[str, object]):
             main_layout.addWidget(paths_group)
 
             layout_group = QGroupBox("Layout")
-            layout_tooltip = "Layout is selected automatically from the cameras found in the input folder."
-            layout_group.setToolTip(layout_tooltip)
             layout_box = QVBoxLayout(layout_group)
             self.layout_combo = QComboBox()
             self.layout_combo.setPlaceholderText("Automatic layout")
             self.layout_combo.setEnabled(False)
-            self.layout_combo.setToolTip(layout_tooltip)
             self.layout_combo.currentTextChanged.connect(self._update_layout_diagram)
             self.diagram_label = QLabel()
             self.diagram_label.setObjectName("Diagram")
-            self.diagram_label.setToolTip(layout_tooltip)
             self.diagram_label.setFrameShape(QFrame.Shape.StyledPanel)
             self.diagram_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.diagram_label.setMinimumHeight(94)
@@ -398,7 +394,7 @@ def create_main_window(qt: dict[str, object]):
             self._append_log(summary)
             self.status_label.setText("Ready to render." if scan_result.is_ready else "Check the details before rendering.")
             self.progress.setRange(0, 100)
-            self.progress.setValue(100 if scan_result.is_ready else 0)
+            self.progress.setValue(0)
 
         def _on_render_progress(self, progress):
             percent, status = ui_helpers.format_progress(progress)

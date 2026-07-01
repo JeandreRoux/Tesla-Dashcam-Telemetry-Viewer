@@ -42,14 +42,14 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertEqual(window.layout_combo.placeholderText(), "Automatic layout")
         self.assertIn("Camera layout", window.diagram_label.text())
         self.assertEqual(window.status_label.text(), "Add an input folder to begin.")
-        self.assertEqual(
-            window.layout_combo.toolTip(),
-            "Layout is selected automatically from the cameras found in the input folder.",
-        )
+        self.assertEqual(window.layout_combo.toolTip(), "")
+        self.assertEqual(window.diagram_label.toolTip(), "")
         self.assertFalse(window.render_button.isEnabled())
 
     def test_scan_result_populates_detected_layout(self):
         window = self.MainWindow()
+        window.input_edit.setText("/input")
+        window.output_edit.setText("/output")
         scan = app_service.ScanResult(
             input_path=Path("/input"),
             layout=layouts.SIX_CAMERA_DEFAULT,
@@ -58,9 +58,13 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         )
 
         window._on_scan_finished(scan)
+        window._sync_buttons()
 
         self.assertEqual(window.layout_combo.currentText(), "Six-camera grid")
         self.assertIn("Left pillar", window.diagram_label.text())
+        self.assertEqual(window.status_label.text(), "Ready to render.")
+        self.assertEqual(window.progress.value(), 0)
+        self.assertTrue(window.render_button.isEnabled())
 
 
 if __name__ == "__main__":
