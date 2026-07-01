@@ -8,6 +8,24 @@ This project follows semantic versioning where practical.
 
 - No unreleased changes yet.
 
+## [0.4.0] - 2026-07-01
+
+### Added
+
+- Desktop app entry point for rendering TeslaCam clips through a simple guided workflow.
+- MP4 output preflight check with desktop and CLI guidance when FFmpeg support is missing.
+- Windows portable app packaging with a GitHub Actions build artifact.
+- Tagged releases now attach the Windows portable app ZIP alongside the Python package files.
+
+### Changed
+
+- README now documents the desktop app workflow and keeps MP4 support guidance concise.
+- Desktop UI copy, screenshot, and scan progress behaviour were refined for the pre-v1 app.
+
+### Fixed
+
+- GitHub Actions Windows app artifacts no longer require unzipping a ZIP inside another ZIP.
+
 ## [0.2.0] - 2026-06-30
 
 ### Added
@@ -42,6 +60,7 @@ This project follows semantic versioning where practical.
 - Bundled font/resource loading so the installed command works outside the repository directory.
 - Python support metadata aligned to Python 3.11+ based on pinned dependency compatibility.
 
-[Unreleased]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.2.0...v0.4.0
 [0.2.0]: https://github.com/JeandreRoux/teslacam-telemetry/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JeandreRoux/teslacam-telemetry/releases/tag/v0.1.0
