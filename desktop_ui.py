@@ -147,6 +147,7 @@ def create_main_window(qt: dict[str, object]):
             self._worker = None
             self._last_scan = None
             self._last_output_path: Path | None = None
+            self._codec_warning_shown = False
             self.setWindowTitle(APP_NAME)
             self.resize(960, 720)
             self._build_ui()
@@ -158,6 +159,7 @@ def create_main_window(qt: dict[str, object]):
             elif input_path:
                 self.output_edit.setText(self._native_path_text(ui_helpers.default_output_folder(input_path)))
             self._sync_buttons()
+            self._show_codec_warning_if_needed()
             if input_path:
                 self._scan_selected_input()
 
@@ -330,6 +332,16 @@ def create_main_window(qt: dict[str, object]):
             has_input = bool(self.input_edit.text().strip())
             has_output = bool(self.output_edit.text().strip())
             self.render_button.setEnabled(has_input and has_output and not busy and bool(self._last_scan and self._last_scan.is_ready))
+
+        def _show_codec_warning_if_needed(self):
+            if self._codec_warning_shown:
+                return
+            codec_check = app_service.check_mp4_output_support()
+            if codec_check.is_supported:
+                return
+            self._codec_warning_shown = True
+            self._append_log(codec_check.message)
+            QMessageBox.warning(self, "MP4 video support is missing", codec_check.message)
 
         def _set_busy(self, busy: bool, status: str):
             self.status_label.setText(status)

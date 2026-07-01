@@ -61,6 +61,10 @@ def main() -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
 
+    codec_check = app_service.check_mp4_output_support()
+    if not codec_check.is_supported:
+        sys.exit(codec_check.message)
+
     scan_result = app_service.scan_input_folder(input_path, settings)
     print(app_service.format_scan_summary(scan_result))
     if scan_result.errors:

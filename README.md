@@ -25,7 +25,7 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 
 ## Prerequisites
 1. **Python 3.11+**: Check version with `python --version` in a terminal window.
-2. **MP4 codec support**: OpenCV needs MP4 encoding support to write the output video. Installing FFmpeg is recommended if MP4 output fails.
+2. **MP4 codec support**: OpenCV needs MP4 encoding support to write the output video. The desktop app and command line check this at startup and show OS-specific FFmpeg install instructions if MP4 output is unavailable.
 
 ## Installation
 

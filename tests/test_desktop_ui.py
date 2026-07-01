@@ -1,6 +1,7 @@
 import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from modules import app_service, layouts
 
@@ -35,7 +36,8 @@ class TestDesktopUiLayoutState(unittest.TestCase):
             widget.close()
 
     def test_launch_does_not_show_default_layout_before_input_scan(self):
-        window = self.MainWindow()
+        with patch_supported_codec():
+            window = self.MainWindow()
 
         self.assertEqual(window.layout_combo.count(), 0)
         self.assertEqual(window.layout_combo.currentText(), "")
@@ -47,7 +49,8 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertFalse(window.render_button.isEnabled())
 
     def test_scan_result_populates_detected_layout(self):
-        window = self.MainWindow()
+        with patch_supported_codec():
+            window = self.MainWindow()
         window.input_edit.setText("/input")
         window.output_edit.setText("/output")
         scan = app_service.ScanResult(
@@ -65,6 +68,39 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertEqual(window.status_label.text(), "Ready to render.")
         self.assertEqual(window.progress.value(), 0)
         self.assertTrue(window.render_button.isEnabled())
+
+    def test_launch_warns_when_mp4_codec_is_missing(self):
+        warnings = []
+
+        class FakeMessageBox:
+            @staticmethod
+            def warning(parent, title, message):
+                warnings.append((title, message))
+
+        qt = dict(self.qt)
+        qt["QMessageBox"] = FakeMessageBox
+        assert desktop_ui is not None
+        MainWindow = desktop_ui.create_main_window(qt)
+
+        with patch(
+            "modules.app_service.check_mp4_output_support",
+            return_value=app_service.CodecCheckResult(
+                is_supported=False,
+                message="MP4 video support is missing.\n\nWindows: winget install ffmpeg",
+            ),
+        ):
+            window = MainWindow()
+
+        self.assertEqual(warnings[0][0], "MP4 video support is missing")
+        self.assertIn("winget install ffmpeg", warnings[0][1])
+        self.assertIn("winget install ffmpeg", window.log_panel.toPlainText())
+
+
+def patch_supported_codec():
+    return patch(
+        "modules.app_service.check_mp4_output_support",
+        return_value=app_service.CodecCheckResult(is_supported=True),
+    )
 
 
 if __name__ == "__main__":

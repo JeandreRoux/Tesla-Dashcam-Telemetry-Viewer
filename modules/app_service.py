@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import platform
 from pathlib import Path
+import tempfile
 from typing import Callable
 
 from modules import data_handler
@@ -66,6 +68,14 @@ class RenderResult:
     selected_layout_name: str
 
 
+@dataclass(frozen=True)
+class CodecCheckResult:
+    """Result of checking whether MP4 output can be written."""
+
+    is_supported: bool
+    message: str = ""
+
+
 ProgressCallback = Callable[[RenderProgress], None]
 
 
@@ -85,6 +95,71 @@ def build_render_settings(
         keep_csv=keep_csv,
         layout=layout or layouts.FOUR_CAMERA_DEFAULT,
     )
+
+
+def check_mp4_output_support(
+    *,
+    probe_dir: Path | None = None,
+    platform_name: str | None = None,
+) -> CodecCheckResult:
+    """Check whether OpenCV can write an MP4 file on this machine."""
+    cleanup_dir = None
+    try:
+        if probe_dir is None:
+            cleanup_dir = tempfile.TemporaryDirectory()
+            probe_dir = Path(cleanup_dir.name)
+        else:
+            probe_dir = Path(probe_dir)
+            probe_dir.mkdir(parents=True, exist_ok=True)
+
+        if video_processor.can_write_mp4(probe_dir):
+            return CodecCheckResult(is_supported=True)
+    except Exception as error:
+        detail = str(error)
+    else:
+        detail = "OpenCV could not create a test MP4 file."
+    finally:
+        if cleanup_dir is not None:
+            cleanup_dir.cleanup()
+
+    return CodecCheckResult(
+        is_supported=False,
+        message=format_mp4_codec_error(platform_name=platform_name, detail=detail),
+    )
+
+
+def format_mp4_codec_error(
+    *,
+    platform_name: str | None = None,
+    detail: str | None = None,
+) -> str:
+    """Return OS-specific guidance for missing MP4 output support."""
+    system = platform_name or platform.system()
+    instructions = _ffmpeg_install_instructions(system)
+    lines = [
+        "MP4 video support is missing.",
+        "",
+        "TeslaCam Telemetry needs MP4 video support to create the finished video.",
+        "Install FFmpeg, then restart the app and try again.",
+        "",
+        instructions,
+        "",
+        "FFmpeg downloads: https://ffmpeg.org/download.html",
+    ]
+    if detail:
+        lines.extend(["", f"Details: {detail}"])
+    return "\n".join(lines)
+
+
+def _ffmpeg_install_instructions(platform_name: str) -> str:
+    system = platform_name.lower()
+    if system == "windows":
+        return "Windows: winget install ffmpeg"
+    if system == "darwin":
+        return "macOS: brew install ffmpeg"
+    if system == "linux":
+        return "Linux: sudo apt update && sudo apt install ffmpeg"
+    return "Install FFmpeg using the recommended package manager for your operating system."
 
 
 def scan_input_folder(input_path: Path, settings: RenderSettings | None = None) -> ScanResult:
