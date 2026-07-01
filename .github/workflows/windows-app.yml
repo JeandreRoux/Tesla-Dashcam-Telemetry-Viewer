@@ -42,4 +42,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TeslaCamTelemetry-windows-portable
-          path: dist/TeslaCamTelemetry-windows-portable.zip
+          path: dist/TeslaCamTelemetry/

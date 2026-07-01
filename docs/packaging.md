@@ -25,9 +25,9 @@ TeslaCamTelemetry.exe
 
 ## GitHub Actions
 
-The **Windows App** workflow builds the same portable ZIP on `windows-latest` and uploads it as a workflow artifact.
+The **Windows App** workflow builds the same app folder on `windows-latest` and uploads it as a workflow artifact. GitHub downloads artifacts as ZIP files, so the workflow uploads the app folder directly to avoid a ZIP inside another ZIP.
 
-For now, the ZIP is a test artifact only. It is not attached to releases automatically, and it is not the `v1` executable yet.
+For now, the artifact is for testing only. It is not attached to releases automatically, and it is not the `v1` executable yet.
 
 ## Current packaging expectations
 
