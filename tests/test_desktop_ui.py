@@ -39,7 +39,13 @@ class TestDesktopUiLayoutState(unittest.TestCase):
 
         self.assertEqual(window.layout_combo.count(), 0)
         self.assertEqual(window.layout_combo.currentText(), "")
-        self.assertIn("Scan an input folder", window.diagram_label.text())
+        self.assertEqual(window.layout_combo.placeholderText(), "Automatic layout")
+        self.assertIn("Camera layout", window.diagram_label.text())
+        self.assertEqual(window.status_label.text(), "Add an input folder to begin.")
+        self.assertEqual(
+            window.layout_combo.toolTip(),
+            "Layout is selected automatically from the cameras found in the input folder.",
+        )
         self.assertFalse(window.render_button.isEnabled())
 
     def test_scan_result_populates_detected_layout(self):
