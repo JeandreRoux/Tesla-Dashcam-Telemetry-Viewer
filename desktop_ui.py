@@ -123,7 +123,7 @@ def create_main_window(qt: dict[str, object]):
             try:
                 settings = ui_helpers.build_settings_from_options(self.options)
                 if self.action == "scan":
-                    self.log.emit(f"Scanning {self.input_path} ...")
+                    self.log.emit(f"Checking {self.input_path} ...")
                     self.scan_finished.emit(app_service.scan_input_folder(self.input_path, settings))
                 else:
                     if self.output_path is None:
@@ -169,19 +169,16 @@ def create_main_window(qt: dict[str, object]):
 
             header = QLabel("TeslaCam Telemetry")
             header.setObjectName("Header")
-            subtitle = QLabel("Render TeslaCam clips with telemetry overlays from a simple desktop workflow.")
-            subtitle.setObjectName("Subtitle")
             main_layout.addWidget(header)
-            main_layout.addWidget(subtitle)
 
             paths_group = QGroupBox("Folders")
             paths_layout = QGridLayout(paths_group)
             self.input_edit = QLineEdit()
-            self.input_edit.setPlaceholderText("Choose a TeslaCam folder containing camera MP4 files")
+            self.input_edit.setPlaceholderText("Add the folder with your TeslaCam videos")
             input_browse = QPushButton("Browse…")
             input_browse.clicked.connect(self._choose_input)
             self.output_edit = QLineEdit()
-            self.output_edit.setPlaceholderText("Choose where rendered videos should be written")
+            self.output_edit.setPlaceholderText("Choose where to save the finished video")
             output_browse = QPushButton("Browse…")
             output_browse.clicked.connect(self._choose_output)
             paths_layout.addWidget(QLabel("Input folder"), 0, 0)
@@ -195,9 +192,8 @@ def create_main_window(qt: dict[str, object]):
             layout_group = QGroupBox("Layout")
             layout_box = QVBoxLayout(layout_group)
             self.layout_combo = QComboBox()
-            self.layout_combo.setPlaceholderText("Select an input folder to detect layout")
+            self.layout_combo.setPlaceholderText("Automatic layout")
             self.layout_combo.setEnabled(False)
-            self.layout_combo.setToolTip("The first desktop UI auto-selects the default layout for the detected camera set. Manual layout choices come next.")
             self.layout_combo.currentTextChanged.connect(self._update_layout_diagram)
             self.diagram_label = QLabel()
             self.diagram_label.setObjectName("Diagram")
@@ -216,14 +212,9 @@ def create_main_window(qt: dict[str, object]):
             self.overlay_check.setChecked(True)
             self.mph_check = QCheckBox("Use MPH")
             self.keep_csv_check = QCheckBox("Keep generated CSV")
-            self.preview_check = QCheckBox("Preview while rendering")
-            self.preview_check.setChecked(False)
-            self.preview_check.setEnabled(False)
-            self.preview_check.setToolTip("Preview is disabled in the desktop UI to keep rendering non-interactive.")
             options_layout.addWidget(self.overlay_check)
             options_layout.addWidget(self.mph_check)
             options_layout.addWidget(self.keep_csv_check)
-            options_layout.addWidget(self.preview_check)
             options_layout.addStretch(1)
             main_layout.addWidget(options_group)
 
@@ -241,13 +232,13 @@ def create_main_window(qt: dict[str, object]):
 
             self.progress = QProgressBar()
             self.progress.setRange(0, 100)
-            self.status_label = QLabel("Ready. Choose an input folder; the app will scan it automatically.")
+            self.status_label = QLabel("Add an input folder to begin.")
             main_layout.addWidget(self.progress)
             main_layout.addWidget(self.status_label)
 
             self.log_panel = QTextEdit()
             self.log_panel.setReadOnly(True)
-            self.log_panel.setPlaceholderText("Scan and render logs will appear here.")
+            self.log_panel.setPlaceholderText("Details will appear here.")
             self.log_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             main_layout.addWidget(self.log_panel, stretch=1)
 
@@ -262,7 +253,6 @@ def create_main_window(qt: dict[str, object]):
                 QMainWindow { background: #10141f; }
                 QWidget { color: #ecf2ff; font-size: 14px; }
                 QLabel#Header { font-size: 28px; font-weight: 700; }
-                QLabel#Subtitle { color: #a9b7d0; }
                 QGroupBox { border: 1px solid #2b3548; border-radius: 10px; margin-top: 12px; padding: 14px; background: #151b29; }
                 QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 6px; color: #c8d6f0; }
                 QLineEdit, QComboBox, QTextEdit { background: #0c1019; border: 1px solid #33405a; border-radius: 8px; padding: 8px; }
@@ -304,7 +294,7 @@ def create_main_window(qt: dict[str, object]):
 
         def _show_layout_placeholder(self):
             self.layout_combo.clear()
-            self.layout_combo.setPlaceholderText("Select an input folder to detect layout")
+            self.layout_combo.setPlaceholderText("Automatic layout")
             self.diagram_label.setText(ui_helpers.layout_diagram(None))
 
         def _append_log(self, message: str):
@@ -320,7 +310,7 @@ def create_main_window(qt: dict[str, object]):
             self._last_scan = None
             self.open_output_button.setEnabled(False)
             self._show_layout_placeholder()
-            self.status_label.setText("Input changed. Scanning will run automatically when the folder is selected.")
+            self.status_label.setText("Press Enter to check the input folder.")
             self._sync_buttons()
 
         def _scan_selected_input(self):
@@ -364,7 +354,7 @@ def create_main_window(qt: dict[str, object]):
             self._thread.finished.connect(self._worker_stopped)
             if action == "scan":
                 self._worker.scan_finished.connect(self._on_scan_finished)
-                self._set_busy(True, "Scanning input folder…")
+                self._set_busy(True, "Checking input folder…")
             else:
                 self.progress.setRange(0, 100)
                 self.progress.setValue(0)
@@ -402,9 +392,9 @@ def create_main_window(qt: dict[str, object]):
                 self._show_layout_placeholder()
             summary = ui_helpers.format_scan_summary_for_ui(scan_result)
             self._append_log(summary)
-            self.status_label.setText("Ready to render." if scan_result.is_ready else "Scan found issues. See log.")
+            self.status_label.setText("Ready to render." if scan_result.is_ready else "Check the details before rendering.")
             self.progress.setRange(0, 100)
-            self.progress.setValue(100 if scan_result.is_ready else 0)
+            self.progress.setValue(0)
 
         def _on_render_progress(self, progress):
             percent, status = ui_helpers.format_progress(progress)
@@ -417,13 +407,13 @@ def create_main_window(qt: dict[str, object]):
             self.open_output_button.setEnabled(True)
             self.progress.setValue(100)
             output_text = self._native_path_text(result.output_path)
-            self.status_label.setText(f"Render complete: {output_text}")
-            self._append_log(f"Render complete: {output_text}")
+            self.status_label.setText(f"Finished: {output_text}")
+            self._append_log(f"Finished: {output_text}")
 
         def _on_failed(self, message: str):
             self.progress.setRange(0, 100)
             self.progress.setValue(0)
-            self.status_label.setText("Operation failed. See log.")
+            self.status_label.setText("Something went wrong. See details below.")
             self._append_log(f"Error: {message}")
             QMessageBox.warning(self, APP_NAME, message)
 
