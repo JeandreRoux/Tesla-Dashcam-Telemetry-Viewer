@@ -108,6 +108,35 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertEqual(window.status_label.text(), "Select at least one clip to render.")
         self.assertFalse(window.render_button.isEnabled())
 
+    def test_customized_clip_selection_updates_layout_preview(self):
+        with patch_supported_codec():
+            window = self.MainWindow()
+        window.input_edit.setText("/input")
+        window.output_edit.setText("/output")
+        scan = app_service.ScanResult(
+            input_path=Path("/input"),
+            video_data=clip_group_video_data(layouts.SIX_CAMERA_KEYS, count=2),
+            layout=layouts.SIX_CAMERA_DEFAULT,
+            camera_set="six-camera",
+            clip_group_count=2,
+        )
+        preview = app_service.PreviewFrame(
+            timestamp="2026-06-19_23-09-01",
+            image_rgb=np.zeros((720, 1280, 3), dtype=np.uint8),
+        )
+
+        window._on_scan_finished(scan)
+        with patch("modules.app_service.build_layout_preview_frame", return_value=preview) as build_preview:
+            window._set_selected_timestamps(("2026-06-19_23-09-01",))
+
+        build_preview.assert_called_once_with(scan, "2026-06-19_23-09-01")
+        pixmap = window.diagram_label.pixmap()
+        self.assertIsNotNone(pixmap)
+        assert pixmap is not None
+        self.assertFalse(pixmap.isNull())
+        self.assertEqual(window.diagram_label.text(), "")
+        self.assertIn("2026-06-19_23-09-01", window.diagram_label.toolTip())
+
     def test_scan_result_shows_preview_frame_when_available(self):
         with patch_supported_codec():
             window = self.MainWindow()
@@ -119,6 +148,7 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         )
         scan = app_service.ScanResult(
             input_path=Path("/input"),
+            video_data=clip_group_video_data(layouts.FOUR_CAMERA_KEYS),
             layout=layouts.FOUR_CAMERA_DEFAULT,
             camera_set="four-camera",
             clip_group_count=1,

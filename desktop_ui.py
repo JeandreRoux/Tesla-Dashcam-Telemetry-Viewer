@@ -503,6 +503,7 @@ def create_main_window(qt: dict[str, object]):
         def _set_selected_timestamps(self, timestamps: tuple[str, ...]):
             self._selected_timestamps = timestamps
             self._update_clip_summary()
+            self._update_selected_clip_preview()
             if self._thread is None:
                 self.progress.setRange(0, 100)
                 self.progress.setValue(0)
@@ -512,6 +513,19 @@ def create_main_window(qt: dict[str, object]):
                 else:
                     self.status_label.setText("Select at least one clip to render.")
             self._sync_buttons()
+
+        def _update_selected_clip_preview(self):
+            if not self._last_scan or not self._last_scan.is_ready:
+                return
+            if not self._selected_timestamps:
+                self._update_layout_diagram(self.layout_combo.currentText())
+                return
+            preview_frame = app_service.build_layout_preview_frame(
+                self._last_scan,
+                self._selected_timestamps[0],
+            )
+            if preview_frame is not None:
+                self._show_preview_frame(preview_frame)
 
         def _update_clip_summary(self):
             total = len(ui_helpers.sorted_clip_timestamps(self._last_scan)) if self._last_scan else 0
