@@ -231,7 +231,11 @@ class TestRenderVideo(unittest.TestCase):
                     progress_callback=progress_updates.append,
                 )
 
-            compile_video_data.assert_called_once_with(input_path, settings)
+            compile_video_data.assert_called_once_with(
+                input_path,
+                settings,
+                generate_missing_telemetry=False,
+            )
             validate_camera_data.assert_called_once_with(video_data, layouts.FOUR_CAMERA_DEFAULT)
             validate_telemetry_data.assert_called_once_with(settings, video_data, input_path)
             get_video_fps.assert_called_once_with(input_path, video_data)
@@ -251,6 +255,124 @@ class TestRenderVideo(unittest.TestCase):
             self.assertEqual(progress_updates[0].clip_index, 1)
             self.assertEqual(progress_updates[0].clip_count, 1)
             self.assertEqual(progress_updates[0].total_frames, 3)
+
+    def test_render_video_uses_selected_clip_groups_when_provided(self):
+        with TemporaryDirectory() as temp_input, TemporaryDirectory() as temp_output:
+            input_path = Path(temp_input)
+            output_path = Path(temp_output)
+            settings = app_service.build_render_settings(no_overlay=True)
+            selected_timestamp = "2026-06-19_23-09-01"
+            video_data = {
+                TIMESTAMP: {camera: f"{TIMESTAMP}-{camera}.mp4" for camera in FOUR_CAMERAS},
+                selected_timestamp: {camera: f"{selected_timestamp}-{camera}.mp4" for camera in FOUR_CAMERAS},
+            }
+            selected_video_data = {selected_timestamp: video_data[selected_timestamp]}
+            writer = _FakeWriter()
+
+            with patch(
+                "modules.data_handler.compile_video_data", return_value=video_data
+            ) as compile_video_data, patch("modules.data_handler.validate_camera_data"), patch(
+                "modules.data_handler.validate_telemetry_data"
+            ), patch(
+                "modules.video_processor.get_video_fps", return_value=(selected_timestamp, 5.0)
+            ) as get_video_fps, patch(
+                "modules.video_processor.create_video_writer",
+                return_value=(writer, output_path / f"TeslaCam_{selected_timestamp}.mp4"),
+            ), patch(
+                "modules.video_processor.open_captures", return_value={}
+            ) as open_captures, patch(
+                "modules.video_processor.get_total_frames", return_value=1
+            ), patch(
+                "modules.video_processor.process_video"
+            ), patch(
+                "modules.video_processor.release_captures"
+            ), patch(
+                "modules.video_processor.close_preview_windows"
+            ), patch(
+                "modules.data_handler.remove_generated_csv"
+            ) as remove_generated_csv:
+                result = app_service.render_video(
+                    app_service.RenderJob(
+                        input_path,
+                        output_path,
+                        settings,
+                        selected_timestamps=(selected_timestamp,),
+                    )
+                )
+
+            compile_video_data.assert_called_once_with(
+                input_path,
+                settings,
+                generate_missing_telemetry=False,
+            )
+            get_video_fps.assert_called_once_with(input_path, selected_video_data)
+            open_captures.assert_called_once_with(
+                input_path=input_path,
+                files_info=selected_video_data[selected_timestamp],
+                layout=layouts.FOUR_CAMERA_DEFAULT,
+            )
+            remove_generated_csv.assert_called_once_with(input_path, selected_video_data, settings)
+            self.assertEqual(result.clip_count, 1)
+            self.assertEqual(result.output_path, output_path / f"TeslaCam_{selected_timestamp}.mp4")
+
+    def test_render_video_generates_telemetry_only_for_selected_clip_groups(self):
+        with TemporaryDirectory() as temp_input, TemporaryDirectory() as temp_output:
+            input_path = Path(temp_input)
+            output_path = Path(temp_output)
+            settings = app_service.build_render_settings(no_overlay=False)
+            selected_timestamp = "2026-06-19_23-09-01"
+            video_data = {
+                TIMESTAMP: {camera: f"{TIMESTAMP}-{camera}.mp4" for camera in FOUR_CAMERAS},
+                selected_timestamp: {camera: f"{selected_timestamp}-{camera}.mp4" for camera in FOUR_CAMERAS},
+            }
+            selected_video_data = {selected_timestamp: video_data[selected_timestamp]}
+            generated_video_data = {
+                selected_timestamp: {
+                    **video_data[selected_timestamp],
+                    "data": f"{selected_timestamp}-generated_sei.csv",
+                }
+            }
+            writer = _FakeWriter()
+
+            with patch(
+                "modules.data_handler.compile_video_data", return_value=video_data
+            ), patch("modules.data_handler.validate_camera_data"), patch(
+                "modules.data_handler.generate_sei_data", return_value=generated_video_data
+            ) as generate_sei_data, patch(
+                "modules.data_handler.validate_telemetry_data"
+            ) as validate_telemetry_data, patch(
+                "modules.video_processor.get_video_fps", return_value=(selected_timestamp, 5.0)
+            ), patch(
+                "modules.video_processor.create_video_writer",
+                return_value=(writer, output_path / f"TeslaCam_{selected_timestamp}.mp4"),
+            ), patch(
+                "modules.video_processor.open_captures", return_value={}
+            ), patch(
+                "modules.video_processor.get_total_frames", return_value=1
+            ), patch(
+                "modules.data_handler.load_telemetry_data"
+            ), patch(
+                "modules.video_processor.process_video"
+            ), patch(
+                "modules.video_processor.release_captures"
+            ), patch(
+                "modules.video_processor.close_preview_windows"
+            ), patch(
+                "modules.data_handler.remove_generated_csv"
+            ) as remove_generated_csv:
+                result = app_service.render_video(
+                    app_service.RenderJob(
+                        input_path,
+                        output_path,
+                        settings,
+                        selected_timestamps=(selected_timestamp,),
+                    )
+                )
+
+            generate_sei_data.assert_called_once_with(selected_video_data, input_path, settings)
+            validate_telemetry_data.assert_called_once_with(settings, generated_video_data, input_path)
+            remove_generated_csv.assert_called_once_with(input_path, generated_video_data, settings)
+            self.assertEqual(result.clip_count, 1)
 
 
 class _FakeCapture:

@@ -6,7 +6,9 @@ This project follows semantic versioning where practical.
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+### Added
+
+- Desktop app can show a clip-selection summary, open a clip picker, and render only the selected clips without generating telemetry CSV files for unselected clips.
 
 ## [0.4.0] - 2026-07-01
 

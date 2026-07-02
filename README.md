@@ -8,7 +8,7 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 
 ## Features
 * **Multi-cam Sync**: Automatically stitches four-camera and six-camera TeslaCam clips into a single frame.
-* **Batch Processing**: Ability to add multiple sets of clips to be processed into one large video automatically in order of timestamp.
+* **Batch Processing**: Render multiple sets of clips into one large video automatically in timestamp order, with desktop clip selection when you only need part of the folder.
 * **Telemetry Overlay**: Real-time visualization of:
 	* Speed
 	* Gear selection
@@ -126,13 +126,14 @@ Basic workflow:
 
 1. Add the folder with your TeslaCam videos.
 2. Check the detected layout preview.
-3. Choose where to save the finished video.
-4. Select render options:
+3. Review the clip count. Click **Customize clips…** if you only want to render selected clips.
+4. Choose where to save the finished video.
+5. Select render options:
    * **Telemetry overlay**: Adds speed, gear, steering, pedal, and driving-state data when telemetry is available.
    * **Use MPH**: Shows speed in MPH instead of KM/H.
    * **Keep generated CSV**: Keeps telemetry CSV files generated from embedded SEI metadata.
-5. Click **Render**.
-6. When rendering completes, click **Open output folder** to view the finished video.
+6. Click **Render**.
+7. When rendering completes, click **Open output folder** to view the finished video.
 
 After you add an input folder, the app detects the available cameras and selects the matching layout:
 
@@ -163,9 +164,9 @@ Planned priorities:
 
 * **Packaged app polish**: Keep improving Windows/macOS downloads, signing, and first-run guidance.
 * **Layout choices**: Add friendly layout options such as **Four-camera standard**, **Six-camera grid**, **Front focus**, and **Balanced grid**.
-* **Clip selection**: Show detected clip groups so you can render everything, selected clips, or a time range.
-* **Render presets**: Add simple quality choices such as fast preview, standard quality, high quality, and smaller shareable files.
 * **Better render controls**: Add clearer progress, cancellation, and troubleshooting details for long renders.
+* **Clip ranges**: Add time-range selection for longer folders.
+* **Render presets**: Add simple quality choices such as fast preview, standard quality, high quality, and smaller shareable files.
 * **Overlay presets**: Add simple telemetry overlay styles such as minimal, detailed, and video-only.
 
 ## Known Limitations

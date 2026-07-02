@@ -39,6 +39,7 @@ class UiRenderOptions:
     keep_csv: bool = False
     preview: bool = False
     layout_label: str = UNKNOWN_LAYOUT_LABEL
+    selected_timestamps: tuple[str, ...] = ()
 
 
 def available_layout_labels() -> list[str]:
@@ -98,6 +99,20 @@ def format_scan_summary_for_ui(scan_result: app_service.ScanResult) -> str:
             f"Selected layout: {layout_display_name(scan_result.layout)}",
         )
     return summary
+
+
+def clip_group_label(timestamp: str, files_info: dict[str, str | None]) -> str:
+    """Return a compact user-facing label for one detected clip group."""
+    camera_count = sum(
+        1 for camera_key in layouts.ALL_CAMERA_KEYS if files_info.get(camera_key)
+    )
+    camera_word = "camera" if camera_count == 1 else "cameras"
+    return f"{timestamp} — {camera_count} {camera_word}"
+
+
+def sorted_clip_timestamps(scan_result: app_service.ScanResult) -> list[str]:
+    """Return scan clip timestamps in render order."""
+    return sorted(scan_result.video_data.keys())
 
 
 def format_progress(progress: app_service.RenderProgress) -> tuple[int, str]:

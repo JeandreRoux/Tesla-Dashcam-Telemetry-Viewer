@@ -28,6 +28,7 @@ def _load_qt():
         QApplication,
         QCheckBox,
         QComboBox,
+        QDialog,
         QFileDialog,
         QFrame,
         QGridLayout,
@@ -35,6 +36,8 @@ def _load_qt():
         QHBoxLayout,
         QLabel,
         QLineEdit,
+        QListWidget,
+        QListWidgetItem,
         QMainWindow,
         QMessageBox,
         QPushButton,
@@ -60,6 +63,7 @@ def _load_qt():
         "QApplication": QApplication,
         "QCheckBox": QCheckBox,
         "QComboBox": QComboBox,
+        "QDialog": QDialog,
         "QFileDialog": QFileDialog,
         "QFrame": QFrame,
         "QGridLayout": QGridLayout,
@@ -67,6 +71,8 @@ def _load_qt():
         "QHBoxLayout": QHBoxLayout,
         "QLabel": QLabel,
         "QLineEdit": QLineEdit,
+        "QListWidget": QListWidget,
+        "QListWidgetItem": QListWidgetItem,
         "QMainWindow": QMainWindow,
         "QMessageBox": QMessageBox,
         "QPushButton": QPushButton,
@@ -92,6 +98,7 @@ def create_main_window(qt: dict[str, object]):
     QPixmap = qt["QPixmap"]
     QCheckBox = qt["QCheckBox"]
     QComboBox = qt["QComboBox"]
+    QDialog = qt["QDialog"]
     QFileDialog = qt["QFileDialog"]
     QFrame = qt["QFrame"]
     QGridLayout = qt["QGridLayout"]
@@ -99,6 +106,8 @@ def create_main_window(qt: dict[str, object]):
     QHBoxLayout = qt["QHBoxLayout"]
     QLabel = qt["QLabel"]
     QLineEdit = qt["QLineEdit"]
+    QListWidget = qt["QListWidget"]
+    QListWidgetItem = qt["QListWidgetItem"]
     QMainWindow = qt["QMainWindow"]
     QMessageBox = qt["QMessageBox"]
     QPushButton = qt["QPushButton"]
@@ -140,7 +149,12 @@ def create_main_window(qt: dict[str, object]):
                     self.output_path.mkdir(parents=True, exist_ok=True)
                     self.log.emit(f"Rendering to {self.output_path} ...")
                     result = app_service.render_video(
-                        app_service.RenderJob(self.input_path, self.output_path, settings),
+                        app_service.RenderJob(
+                            self.input_path,
+                            self.output_path,
+                            settings,
+                            selected_timestamps=self.options.selected_timestamps or None,
+                        ),
                         progress_callback=self.render_progress.emit,
                     )
                     self.render_finished.emit(result)
@@ -149,12 +163,144 @@ def create_main_window(qt: dict[str, object]):
             finally:
                 self.done.emit()
 
+    class ClipSelectionDialog(QDialog):
+        def __init__(self, parent, scan_result: app_service.ScanResult, selected_timestamps: tuple[str, ...]):
+            super().__init__(parent)
+            self.scan_result = scan_result
+            self.setWindowTitle("Customize clips")
+            self.resize(860, 520)
+
+            root = QVBoxLayout(self)
+            content = QHBoxLayout()
+
+            left = QVBoxLayout()
+            self.clip_list = QListWidget()
+            self.clip_list.setMinimumWidth(300)
+            self.clip_list.itemChanged.connect(self._update_selection_summary)
+            self.clip_list.currentItemChanged.connect(self._show_current_preview)
+            left.addWidget(self.clip_list)
+
+            bulk_actions = QHBoxLayout()
+            select_all = QPushButton("Select all")
+            select_none = QPushButton("Select none")
+            select_all.clicked.connect(self._select_all)
+            select_none.clicked.connect(self._select_none)
+            bulk_actions.addWidget(select_all)
+            bulk_actions.addWidget(select_none)
+            left.addLayout(bulk_actions)
+            content.addLayout(left, stretch=1)
+
+            right = QVBoxLayout()
+            self.preview_label = QLabel("Select a clip to preview it.")
+            self.preview_label.setObjectName("Diagram")
+            self.preview_label.setFrameShape(QFrame.Shape.StyledPanel)
+            self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.preview_label.setMinimumSize(420, 260)
+            self.preview_label.setWordWrap(True)
+            self.selection_summary = QLabel("")
+            right.addWidget(self.preview_label, stretch=1)
+            right.addWidget(self.selection_summary)
+            content.addLayout(right, stretch=2)
+            root.addLayout(content)
+
+            actions = QHBoxLayout()
+            actions.addStretch(1)
+            cancel = QPushButton("Cancel")
+            apply = QPushButton("Apply")
+            apply.setObjectName("PrimaryButton")
+            cancel.clicked.connect(self.reject)
+            apply.clicked.connect(self.accept)
+            actions.addWidget(cancel)
+            actions.addWidget(apply)
+            root.addLayout(actions)
+
+            self._populate(selected_timestamps)
+            self._update_selection_summary()
+            if self.clip_list.count():
+                self.clip_list.setCurrentRow(0)
+
+        def _populate(self, selected_timestamps: tuple[str, ...]):
+            selected = set(selected_timestamps)
+            for timestamp in ui_helpers.sorted_clip_timestamps(self.scan_result):
+                files_info = self.scan_result.video_data[timestamp]
+                item = QListWidgetItem(ui_helpers.clip_group_label(timestamp, files_info))
+                item.setData(Qt.ItemDataRole.UserRole, timestamp)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Checked if timestamp in selected else Qt.CheckState.Unchecked)
+                self.clip_list.addItem(item)
+
+        def _select_all(self):
+            for index in range(self.clip_list.count()):
+                self.clip_list.item(index).setCheckState(Qt.CheckState.Checked)
+
+        def _select_none(self):
+            for index in range(self.clip_list.count()):
+                self.clip_list.item(index).setCheckState(Qt.CheckState.Unchecked)
+
+        def _show_current_preview(self, current, _previous=None):
+            if current is None:
+                self.preview_label.setText("Select a clip to preview it.")
+                self.preview_label.setPixmap(QPixmap())
+                return
+            timestamp = current.data(Qt.ItemDataRole.UserRole)
+            preview = app_service.build_camera_preview_frame(self.scan_result, str(timestamp))
+            if preview is None:
+                self.preview_label.setPixmap(QPixmap())
+                self.preview_label.setText("Preview unavailable for this clip.")
+                return
+            pixmap = self._pixmap_from_preview(preview)
+            if pixmap is None:
+                return
+            target_size = self.preview_label.size()
+            if target_size.width() > 0 and target_size.height() > 0:
+                pixmap = pixmap.scaled(
+                    target_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            self.preview_label.setText("")
+            self.preview_label.setPixmap(pixmap)
+
+        def _pixmap_from_preview(self, preview_frame: app_service.PreviewFrame):
+            image = preview_frame.image_rgb
+            height, width, channels = image.shape
+            if channels != 3:
+                return None
+            qimage = QImage(
+                image.data,
+                width,
+                height,
+                channels * width,
+                QImage.Format.Format_RGB888,
+            ).copy()
+            return QPixmap.fromImage(qimage)
+
+        def _update_selection_summary(self):
+            selected = len(self.selected_timestamps())
+            total = self.clip_list.count()
+            if total == 0:
+                self.selection_summary.setText("No clips found.")
+            elif selected == total:
+                self.selection_summary.setText(f"All {total} clips selected")
+            else:
+                self.selection_summary.setText(f"{selected} of {total} clips selected")
+
+        def selected_timestamps(self) -> tuple[str, ...]:
+            timestamps: list[str] = []
+            for index in range(self.clip_list.count()):
+                item = self.clip_list.item(index)
+                timestamp = item.data(Qt.ItemDataRole.UserRole)
+                if timestamp and item.checkState() == Qt.CheckState.Checked:
+                    timestamps.append(str(timestamp))
+            return tuple(timestamps)
+
     class MainWindow(QMainWindow):
         def __init__(self, input_path: str | None = None, output_path: str | None = None):
             super().__init__()
             self._thread = None
             self._worker = None
             self._last_scan = None
+            self._selected_timestamps: tuple[str, ...] = ()
             self._last_output_path: Path | None = None
             self._codec_warning_shown = False
             self._mp4_output_supported = True
@@ -187,18 +333,18 @@ def create_main_window(qt: dict[str, object]):
             paths_layout = QGridLayout(paths_group)
             self.input_edit = QLineEdit()
             self.input_edit.setPlaceholderText("Add the folder with your TeslaCam videos")
-            input_browse = QPushButton("Browse…")
-            input_browse.clicked.connect(self._choose_input)
+            self.input_browse_button = QPushButton("Browse…")
+            self.input_browse_button.clicked.connect(self._choose_input)
             self.output_edit = QLineEdit()
             self.output_edit.setPlaceholderText("Choose where to save the finished video")
-            output_browse = QPushButton("Browse…")
-            output_browse.clicked.connect(self._choose_output)
+            self.output_browse_button = QPushButton("Browse…")
+            self.output_browse_button.clicked.connect(self._choose_output)
             paths_layout.addWidget(QLabel("Input folder"), 0, 0)
             paths_layout.addWidget(self.input_edit, 0, 1)
-            paths_layout.addWidget(input_browse, 0, 2)
+            paths_layout.addWidget(self.input_browse_button, 0, 2)
             paths_layout.addWidget(QLabel("Output folder"), 1, 0)
             paths_layout.addWidget(self.output_edit, 1, 1)
-            paths_layout.addWidget(output_browse, 1, 2)
+            paths_layout.addWidget(self.output_browse_button, 1, 2)
             main_layout.addWidget(paths_group)
 
             layout_group = QGroupBox("Layout preview")
@@ -217,6 +363,17 @@ def create_main_window(qt: dict[str, object]):
             layout_box.addWidget(self.diagram_label)
             main_layout.addWidget(layout_group)
             self._show_layout_placeholder()
+
+            clips_group = QGroupBox("Clips")
+            clips_layout = QHBoxLayout(clips_group)
+            self.clip_summary_label = QLabel("Clips selected: none yet")
+            self.customize_clips_button = QPushButton("Customize clips…")
+            self.customize_clips_button.clicked.connect(self._customize_clips)
+            self.customize_clips_button.setEnabled(False)
+            clips_layout.addWidget(self.clip_summary_label)
+            clips_layout.addStretch(1)
+            clips_layout.addWidget(self.customize_clips_button)
+            main_layout.addWidget(clips_group)
 
             options_group = QGroupBox("Options")
             options_layout = QHBoxLayout(options_group)
@@ -267,7 +424,7 @@ def create_main_window(qt: dict[str, object]):
                 QLabel#Header { font-size: 28px; font-weight: 700; }
                 QGroupBox { border: 1px solid #2b3548; border-radius: 10px; margin-top: 12px; padding: 14px; background: #151b29; }
                 QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 6px; color: #c8d6f0; }
-                QLineEdit, QComboBox, QTextEdit { background: #0c1019; border: 1px solid #33405a; border-radius: 8px; padding: 8px; }
+                QLineEdit, QComboBox, QTextEdit, QListWidget { background: #0c1019; border: 1px solid #33405a; border-radius: 8px; padding: 8px; }
                 QPushButton { background: #24314a; border: 1px solid #3a4b6f; border-radius: 8px; padding: 9px 14px; }
                 QPushButton:hover { background: #2e3e5d; }
                 QPushButton:disabled { color: #6d7890; background: #192030; border-color: #252d3d; }
@@ -286,6 +443,7 @@ def create_main_window(qt: dict[str, object]):
                 keep_csv=self.keep_csv_check.isChecked(),
                 preview=False,
                 layout_label=self.layout_combo.currentText(),
+                selected_timestamps=self._selected_clip_timestamps(),
             )
 
         def _choose_input(self):
@@ -314,18 +472,9 @@ def create_main_window(qt: dict[str, object]):
             self.diagram_label.setText(ui_helpers.layout_diagram(None))
 
         def _show_preview_frame(self, preview_frame: app_service.PreviewFrame):
-            image = preview_frame.image_rgb
-            height, width, channels = image.shape
-            if channels != 3:
+            pixmap = self._pixmap_from_preview(preview_frame)
+            if pixmap is None:
                 return
-            qimage = QImage(
-                image.data,
-                width,
-                height,
-                channels * width,
-                QImage.Format.Format_RGB888,
-            ).copy()
-            pixmap = QPixmap.fromImage(qimage)
             target_size = self.diagram_label.size()
             if target_size.width() > 0 and target_size.height() > 0:
                 pixmap = pixmap.scaled(
@@ -336,6 +485,67 @@ def create_main_window(qt: dict[str, object]):
             self.diagram_label.setText("")
             self.diagram_label.setPixmap(pixmap)
             self.diagram_label.setToolTip(f"Preview from {preview_frame.timestamp}")
+
+        def _pixmap_from_preview(self, preview_frame: app_service.PreviewFrame):
+            image = preview_frame.image_rgb
+            height, width, channels = image.shape
+            if channels != 3:
+                return None
+            qimage = QImage(
+                image.data,
+                width,
+                height,
+                channels * width,
+                QImage.Format.Format_RGB888,
+            ).copy()
+            return QPixmap.fromImage(qimage)
+
+        def _set_selected_timestamps(self, timestamps: tuple[str, ...]):
+            self._selected_timestamps = timestamps
+            self._update_clip_summary()
+            self._update_selected_clip_preview()
+            if self._thread is None:
+                self.progress.setRange(0, 100)
+                self.progress.setValue(0)
+            if self._last_scan and self._last_scan.is_ready and self._mp4_output_supported:
+                if self._selected_timestamps:
+                    self.status_label.setText("Ready to render.")
+                else:
+                    self.status_label.setText("Select at least one clip to render.")
+            self._sync_buttons()
+
+        def _update_selected_clip_preview(self):
+            if not self._last_scan or not self._last_scan.is_ready:
+                return
+            if not self._selected_timestamps:
+                self._update_layout_diagram(self.layout_combo.currentText())
+                return
+            preview_frame = app_service.build_layout_preview_frame(
+                self._last_scan,
+                self._selected_timestamps[0],
+            )
+            if preview_frame is not None:
+                self._show_preview_frame(preview_frame)
+
+        def _update_clip_summary(self):
+            total = len(ui_helpers.sorted_clip_timestamps(self._last_scan)) if self._last_scan else 0
+            selected = len(self._selected_timestamps)
+            if total == 0:
+                self.clip_summary_label.setText("Clips selected: none yet")
+            elif selected == total:
+                self.clip_summary_label.setText(f"Clips selected: all {total}")
+            else:
+                self.clip_summary_label.setText(f"Clips selected: {selected} of {total}")
+
+        def _customize_clips(self):
+            if not self._last_scan or not self._last_scan.is_ready:
+                return
+            dialog = ClipSelectionDialog(self, self._last_scan, self._selected_timestamps)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self._set_selected_timestamps(dialog.selected_timestamps())
+
+        def _selected_clip_timestamps(self) -> tuple[str, ...]:
+            return self._selected_timestamps
 
         def _append_log(self, message: str):
             self.log_panel.append(message)
@@ -348,8 +558,10 @@ def create_main_window(qt: dict[str, object]):
 
         def _on_input_changed(self):
             self._last_scan = None
+            self._selected_timestamps = ()
             self.open_output_button.setEnabled(False)
             self._show_layout_placeholder()
+            self._update_clip_summary()
             if self._mp4_output_supported:
                 self.status_label.setText("Press Enter to check the input folder.")
             else:
@@ -363,21 +575,34 @@ def create_main_window(qt: dict[str, object]):
                 self._sync_buttons()
                 return
             if not self.output_edit.text().strip():
-                self.output_edit.setText(self._native_path_text(ui_helpers.default_output_folder(self.input_edit.text().strip())))
+                default_output = ui_helpers.default_output_folder(self.input_edit.text().strip())
+                self.output_edit.setText(self._native_path_text(default_output))
             self.log_panel.clear()
             self._last_scan = None
+            self._selected_timestamps = ()
+            self._update_clip_summary()
             self._start_worker("scan")
 
         def _sync_buttons(self):
             busy = self._thread is not None
             has_input = bool(self.input_edit.text().strip())
             has_output = bool(self.output_edit.text().strip())
+            has_selected_clip = bool(
+                self._last_scan
+                and self._last_scan.is_ready
+                and self._selected_clip_timestamps()
+            )
             self.render_button.setEnabled(
                 self._mp4_output_supported
                 and has_input
                 and has_output
                 and not busy
-                and bool(self._last_scan and self._last_scan.is_ready)
+                and has_selected_clip
+            )
+            self.input_browse_button.setEnabled(not busy)
+            self.output_browse_button.setEnabled(not busy)
+            self.customize_clips_button.setEnabled(
+                bool(self._last_scan and self._last_scan.is_ready) and not busy
             )
 
         def _show_codec_warning_if_needed(self):
@@ -477,6 +702,8 @@ def create_main_window(qt: dict[str, object]):
                 self._show_layout_placeholder()
             if scan_result.preview_frame is not None:
                 self._show_preview_frame(scan_result.preview_frame)
+            timestamps = tuple(ui_helpers.sorted_clip_timestamps(scan_result)) if scan_result.is_ready else ()
+            self._set_selected_timestamps(timestamps)
             summary = ui_helpers.format_scan_summary_for_ui(scan_result)
             self._append_log(summary)
             if self._mp4_output_supported:

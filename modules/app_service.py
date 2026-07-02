@@ -57,6 +57,7 @@ class RenderJob:
     input_path: Path
     output_path: Path
     settings: RenderSettings
+    selected_timestamps: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -248,6 +249,14 @@ def build_preview_frame(scan_result: ScanResult) -> PreviewFrame | None:
         return None
 
     timestamp = sorted(scan_result.video_data.keys())[0]
+    return build_layout_preview_frame(scan_result, timestamp)
+
+
+def build_layout_preview_frame(scan_result: ScanResult, timestamp: str) -> PreviewFrame | None:
+    """Return a composed layout preview for one clip group, if possible."""
+    if not scan_result.is_ready or scan_result.layout is None or timestamp not in scan_result.video_data:
+        return None
+
     files_info = scan_result.video_data[timestamp]
     captures = {}
 
@@ -278,6 +287,38 @@ def build_preview_frame(scan_result: ScanResult) -> PreviewFrame | None:
             video_processor.release_captures(captures)
 
 
+def build_camera_preview_frame(
+    scan_result: ScanResult,
+    timestamp: str,
+    *,
+    camera_key: str = "front",
+) -> PreviewFrame | None:
+    """Return a still preview from one camera in a clip group, if possible."""
+    if timestamp not in scan_result.video_data:
+        return None
+
+    files_info = scan_result.video_data[timestamp]
+    video_file = files_info.get(camera_key) or data_handler.get_available_video_file(files_info)
+    if not video_file:
+        return None
+
+    capture = None
+    try:
+        capture = cv.VideoCapture(str(scan_result.input_path / video_file))
+        if not capture.isOpened():
+            return None
+        ok, frame = capture.read()
+        if not ok:
+            return None
+        preview_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        return PreviewFrame(timestamp=timestamp, image_rgb=preview_rgb)
+    except Exception:
+        return None
+    finally:
+        if capture is not None:
+            capture.release()
+
+
 def render_video(
     job: RenderJob,
     progress_callback: ProgressCallback | None = None,
@@ -293,14 +334,35 @@ def render_video(
     video_data: data_handler.VideoData = {}
 
     try:
-        video_data = data_handler.compile_video_data(input_path, settings)
+        video_data = data_handler.compile_video_data(
+            input_path,
+            settings,
+            generate_missing_telemetry=False,
+        )
         try:
             settings.layout = layouts.select_default_layout(video_data)
         except ValueError as error:
             raise SystemExit(str(error)) from error
 
         print(f"Selected layout: {settings.layout['name']}")
+        selected_timestamps = _normalize_selected_timestamps(job.selected_timestamps)
+        if selected_timestamps is not None:
+            missing_timestamps = [
+                timestamp for timestamp in selected_timestamps if timestamp not in video_data
+            ]
+            if missing_timestamps:
+                missing = ", ".join(missing_timestamps)
+                raise SystemExit(f"Selected clip groups were not found: {missing}")
+            video_data = {
+                timestamp: video_data[timestamp]
+                for timestamp in selected_timestamps
+            }
+            if not video_data:
+                raise SystemExit("No clip groups were selected for rendering.")
+
         data_handler.validate_camera_data(video_data, settings.layout)
+        if not settings.no_overlay:
+            video_data = data_handler.generate_sei_data(video_data, input_path, settings)
         data_handler.validate_telemetry_data(settings, video_data, input_path)
 
         first_timestamp, fps = video_processor.get_video_fps(input_path, video_data)
@@ -445,6 +507,21 @@ def _camera_set_for_layout(layout: layouts.LayoutConfig) -> str:
     if required_cameras == layouts.FOUR_CAMERA_KEYS:
         return "four-camera"
     return f"{len(required_cameras)}-camera"
+
+
+def _normalize_selected_timestamps(selected_timestamps: tuple[str, ...] | None) -> tuple[str, ...] | None:
+    """Return a de-duplicated selected timestamp tuple, preserving user order."""
+    if selected_timestamps is None:
+        return None
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for timestamp in selected_timestamps:
+        if timestamp in seen:
+            continue
+        normalized.append(timestamp)
+        seen.add(timestamp)
+    return tuple(normalized)
 
 
 def _output_filename(first_timestamp: str, settings: RenderSettings) -> str:
