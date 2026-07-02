@@ -64,6 +64,10 @@ class RenderJob:
 class TelemetryPromptRequired(RuntimeError):
     """Raised when the desktop app should ask whether to continue without telemetry."""
 
+    def __init__(self, message: str, details: str = ""):
+        super().__init__(message)
+        self.details = details
+
 
 @dataclass(frozen=True)
 class RenderProgress:
@@ -371,6 +375,7 @@ def render_video(
         if not settings.no_overlay:
             video_data = data_handler.generate_sei_data(video_data, input_path, settings)
         data_handler.validate_telemetry_data(settings, video_data, input_path)
+        _validate_telemetry_frame_counts_before_render(settings, video_data, input_path)
 
         first_timestamp, fps = video_processor.get_video_fps(input_path, video_data)
         output_filename = _output_filename(first_timestamp, settings)
@@ -401,7 +406,7 @@ def render_video(
                     )
 
                     data_file = video_data[timestamp].get("data")
-                    if data_file:
+                    if data_file and not settings.no_overlay:
                         telemetry_df = data_handler.load_telemetry_data(
                             input_path=input_path,
                             data_file=data_file,
@@ -451,6 +456,68 @@ def render_video(
         clip_count=len(video_data),
         selected_layout_name=settings.layout["name"],
     )
+
+
+def _validate_telemetry_frame_counts_before_render(
+    settings: RenderSettings,
+    video_data: data_handler.VideoData,
+    input_path: Path,
+) -> None:
+    """Prompt before rendering if any selected clip has partial telemetry rows."""
+    if settings.no_overlay:
+        return
+
+    partial_telemetry_groups: list[tuple[str, str]] = []
+
+    for timestamp, files_info in sorted(video_data.items()):
+        data_file = files_info.get("data")
+        if not data_file:
+            continue
+
+        captures = video_processor.open_captures(
+            input_path=input_path,
+            files_info=files_info,
+            layout=settings.layout,
+        )
+        try:
+            total_frames = video_processor.get_total_frames(captures, settings.layout)
+        finally:
+            video_processor.release_captures(captures)
+
+        if not data_handler.telemetry_csv_matches_frame_count(input_path / data_file, total_frames):
+            partial_telemetry_groups.append((timestamp, data_file))
+
+    if not partial_telemetry_groups:
+        return
+
+    print("Partial telemetry data found before rendering:")
+    for timestamp, data_file in partial_telemetry_groups:
+        print(f"- {timestamp}: {data_file}")
+
+    if settings.telemetry_prompt is not None:
+        raise TelemetryPromptRequired(
+            "Telemetry data is incomplete or unavailable for one or more selected clips.\n\n"
+            "Continue rendering without the telemetry overlay?",
+            details=_partial_telemetry_prompt_details(partial_telemetry_groups),
+        )
+
+    settings.no_overlay = data_handler.continue_without_telemetry_overlay(settings)
+
+
+def _partial_telemetry_prompt_details(partial_telemetry_groups: list[tuple[str, str]]) -> str:
+    lines = [
+        "The following selected clips have partial telemetry data:",
+        "",
+        *(f"- {timestamp}: {data_file}" for timestamp, data_file in partial_telemetry_groups),
+        "",
+        "Common causes include the car being in Park for part of the clip, "
+        "missing or partial telemetry CSV data, or telemetry that cannot be matched to every video frame.",
+        "",
+        "TeslaCam Telemetry can still render the selected clips without the telemetry overlay.",
+        "",
+        "Choose Yes to render without telemetry. Choose No to cancel and leave your settings unchanged.",
+    ]
+    return "\n".join(lines)
 
 
 def format_scan_summary(scan_result: ScanResult) -> str:
