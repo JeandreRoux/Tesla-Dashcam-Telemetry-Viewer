@@ -57,6 +57,7 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         window.output_edit.setText("/output")
         scan = app_service.ScanResult(
             input_path=Path("/input"),
+            video_data=clip_group_video_data(layouts.SIX_CAMERA_KEYS, count=2),
             layout=layouts.SIX_CAMERA_DEFAULT,
             camera_set="six-camera",
             clip_group_count=2,
@@ -67,9 +68,26 @@ class TestDesktopUiLayoutState(unittest.TestCase):
 
         self.assertEqual(window.layout_combo.currentText(), "Six-camera grid")
         self.assertIn("Left pillar", window.diagram_label.text())
+        self.assertEqual(window.clip_summary_label.text(), "Clips selected: all 2")
+        self.assertEqual(
+            window._selected_clip_timestamps(),
+            ("2026-06-19_23-08-01", "2026-06-19_23-09-01"),
+        )
+        self.assertTrue(window.customize_clips_button.isEnabled())
         self.assertEqual(window.status_label.text(), "Ready to render.")
         self.assertEqual(window.progress.value(), 0)
         self.assertTrue(window.render_button.isEnabled())
+
+        window._set_selected_timestamps(("2026-06-19_23-09-01",))
+
+        self.assertEqual(window.clip_summary_label.text(), "Clips selected: 1 of 2")
+        self.assertTrue(window.render_button.isEnabled())
+
+        window._set_selected_timestamps(())
+
+        self.assertEqual(window.clip_summary_label.text(), "Clips selected: 0 of 2")
+        self.assertEqual(window.status_label.text(), "Select at least one clip to render.")
+        self.assertFalse(window.render_button.isEnabled())
 
     def test_scan_result_shows_preview_frame_when_available(self):
         with patch_supported_codec():
@@ -166,6 +184,14 @@ class TestDesktopUiLayoutState(unittest.TestCase):
 
         self.assertEqual(window.status_label.text(), "Install FFmpeg, then restart the app.")
         self.assertFalse(window.render_button.isEnabled())
+
+
+def clip_group_video_data(cameras: tuple[str, ...], *, count: int = 1):
+    timestamps = ["2026-06-19_23-08-01", "2026-06-19_23-09-01", "2026-06-19_23-10-01"]
+    return {
+        timestamp: {camera: f"{timestamp}-{camera}.mp4" for camera in cameras}
+        for timestamp in timestamps[:count]
+    }
 
 
 def patch_supported_codec():
