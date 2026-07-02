@@ -121,6 +121,7 @@ def create_main_window(qt: dict[str, object]):
         scan_finished = Signal(object)
         render_progress = Signal(object)
         render_finished = Signal(object)
+        telemetry_prompt_required = Signal(str)
         failed = Signal(str)
         log = Signal(str)
         done = Signal()
@@ -154,10 +155,13 @@ def create_main_window(qt: dict[str, object]):
                             self.output_path,
                             settings,
                             selected_timestamps=self.options.selected_timestamps or None,
+                            prompt_for_telemetry=True,
                         ),
                         progress_callback=self.render_progress.emit,
                     )
                     self.render_finished.emit(result)
+            except app_service.TelemetryPromptRequired as error:
+                self.telemetry_prompt_required.emit(str(error))
             except BaseException as error:  # surface SystemExit from the shared render pipeline too
                 self.failed.emit(str(error) or error.__class__.__name__)
             finally:
@@ -304,6 +308,8 @@ def create_main_window(qt: dict[str, object]):
             self._last_output_path: Path | None = None
             self._codec_warning_shown = False
             self._mp4_output_supported = True
+            self._pending_render_without_telemetry = False
+            self._telemetry_prompt_active = False
             self.setWindowTitle(APP_NAME)
             self.resize(960, 720)
             self._build_ui()
@@ -657,6 +663,7 @@ def create_main_window(qt: dict[str, object]):
             self._worker.moveToThread(self._thread)
             self._thread.started.connect(self._worker.run)
             self._worker.log.connect(self._append_log)
+            self._worker.telemetry_prompt_required.connect(self._on_telemetry_prompt_required)
             self._worker.failed.connect(self._on_failed)
             self._worker.done.connect(self._thread.quit)
             self._worker.done.connect(self._worker.deleteLater)
@@ -674,10 +681,14 @@ def create_main_window(qt: dict[str, object]):
             self._thread.start()
 
         def _worker_stopped(self):
+            retry_without_telemetry = self._pending_render_without_telemetry
+            self._pending_render_without_telemetry = False
             self._thread = None
             self._worker = None
             self.progress.setRange(0, 100)
             self._sync_buttons()
+            if retry_without_telemetry:
+                self.render()
 
         def scan(self):
             self.log_panel.clear()
@@ -726,6 +737,49 @@ def create_main_window(qt: dict[str, object]):
             output_text = self._native_path_text(result.output_path)
             self.status_label.setText(f"Finished: {output_text}")
             self._append_log(f"Finished: {output_text}")
+
+        def _on_telemetry_prompt_required(self, message: str):
+            if self._telemetry_prompt_active:
+                return
+            self._telemetry_prompt_active = True
+            self.progress.setRange(0, 100)
+            self.progress.setValue(0)
+            self._append_log(message)
+            try:
+                continue_without_telemetry = self._ask_continue_without_telemetry(message)
+            finally:
+                self._telemetry_prompt_active = False
+            if continue_without_telemetry:
+                self.overlay_check.setChecked(False)
+                self.status_label.setText("Rendering without telemetry overlay…")
+                self._append_log("Continuing without telemetry overlay.")
+                self._retry_render_after_prompt()
+            else:
+                self._pending_render_without_telemetry = False
+                self.status_label.setText("Render cancelled.")
+                self._append_log("Render cancelled.")
+
+        def _retry_render_after_prompt(self):
+            if self._thread is None:
+                self.render()
+            else:
+                self._pending_render_without_telemetry = True
+
+        def _ask_continue_without_telemetry(self, message: str) -> bool:
+            dialog = QMessageBox(self)
+            dialog.setIcon(QMessageBox.Icon.Warning)
+            dialog.setWindowTitle("Incomplete telemetry data")
+            dialog.setText(message)
+            dialog.setDetailedText(
+                "Common causes include the car being in Park for part of the clip, "
+                "missing or partial telemetry CSV data, or telemetry that cannot be matched to every video frame.\n\n"
+                "TeslaCam Telemetry can still render the selected clip without the telemetry overlay.\n\n"
+                "Choose Yes to render the video without telemetry. Choose No to cancel and leave your settings unchanged."
+            )
+            dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            dialog.setDefaultButton(QMessageBox.StandardButton.No)
+            dialog.setStyleSheet(self._message_box_stylesheet())
+            return dialog.exec() == QMessageBox.StandardButton.Yes
 
         def _on_failed(self, message: str):
             self.progress.setRange(0, 100)

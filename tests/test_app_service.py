@@ -256,6 +256,39 @@ class TestRenderVideo(unittest.TestCase):
             self.assertEqual(progress_updates[0].clip_count, 1)
             self.assertEqual(progress_updates[0].total_frames, 3)
 
+    def test_render_video_raises_desktop_telemetry_prompt_before_using_input(self):
+        with TemporaryDirectory() as temp_input, TemporaryDirectory() as temp_output:
+            input_path = Path(temp_input)
+            output_path = Path(temp_output)
+            settings = app_service.build_render_settings(no_overlay=False)
+            video_data = {TIMESTAMP: {camera: f"{TIMESTAMP}-{camera}.mp4" for camera in FOUR_CAMERAS}}
+
+            def request_prompt(settings, _video_data, _input_path):
+                assert settings.telemetry_prompt is not None
+                settings.telemetry_prompt()
+
+            with patch(
+                "modules.data_handler.compile_video_data", return_value=video_data
+            ), patch(
+                "modules.data_handler.validate_camera_data"
+            ), patch(
+                "modules.data_handler.generate_sei_data", return_value=video_data
+            ), patch(
+                "modules.data_handler.validate_telemetry_data", side_effect=request_prompt
+            ):
+                with self.assertRaisesRegex(
+                    app_service.TelemetryPromptRequired,
+                    "Continue rendering without the telemetry overlay",
+                ):
+                    app_service.render_video(
+                        app_service.RenderJob(
+                            input_path,
+                            output_path,
+                            settings,
+                            prompt_for_telemetry=True,
+                        )
+                    )
+
     def test_render_video_uses_selected_clip_groups_when_provided(self):
         with TemporaryDirectory() as temp_input, TemporaryDirectory() as temp_output:
             input_path = Path(temp_input)

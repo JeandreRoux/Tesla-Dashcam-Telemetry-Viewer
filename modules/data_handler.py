@@ -108,7 +108,7 @@ def generate_sei_data(
                 video_data[timestamp]["data"] = f"{timestamp}-generated_sei.csv"
             else:
                 print(f"Warning: No SEI data in {mp4_path}")
-                settings.no_overlay = telemetry_user_input()
+                settings.no_overlay = _continue_without_telemetry_overlay(settings)
                 break
         except Exception as e:
             print(f"Error generating CSV for {timestamp}: {e}")
@@ -206,7 +206,7 @@ def validate_telemetry_data(
         for timestamp, reason in invalid_data_timestamps:
             print(f"- {timestamp}: {reason}")
 
-        settings.no_overlay = telemetry_user_input()
+        settings.no_overlay = _continue_without_telemetry_overlay(settings)
 
 
 def load_telemetry_data(
@@ -222,7 +222,7 @@ def load_telemetry_data(
         telemetry_df = pd.read_csv(data_filepath)
     except Exception as e:
         print(f"Error loading telemetry data from {data_filepath}: {e}")
-        settings.no_overlay = telemetry_user_input()
+        settings.no_overlay = _continue_without_telemetry_overlay(settings)
         return None
 
     if len(telemetry_df) != total_frames:
@@ -231,7 +231,7 @@ def load_telemetry_data(
             "This can be caused by the vehicle being in 'Park' for a portion of the video."
         )
         print("Unable to sync telemetry data to video frame.")
-        settings.no_overlay = telemetry_user_input()
+        settings.no_overlay = _continue_without_telemetry_overlay(settings)
         return None
 
     print(f"Successfully loaded telemetry data from: {data_filepath}")
@@ -250,6 +250,13 @@ def telemetry_user_input() -> bool:
             return True
         else:
             print("Expected response 'y' or 'n'. Please try again.")
+
+
+def _continue_without_telemetry_overlay(settings: RenderSettings) -> bool:
+    """Return whether processing should continue without telemetry overlays."""
+    if settings.telemetry_prompt is not None:
+        return settings.telemetry_prompt()
+    return telemetry_user_input()
 
 
 def remove_generated_csv(
