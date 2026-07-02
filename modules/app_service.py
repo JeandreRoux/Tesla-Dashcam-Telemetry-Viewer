@@ -58,6 +58,11 @@ class RenderJob:
     output_path: Path
     settings: RenderSettings
     selected_timestamps: tuple[str, ...] | None = None
+    prompt_for_telemetry: bool = False
+
+
+class TelemetryPromptRequired(RuntimeError):
+    """Raised when the desktop app should ask whether to continue without telemetry."""
 
 
 @dataclass(frozen=True)
@@ -327,6 +332,8 @@ def render_video(
     input_path = Path(job.input_path)
     output_path = Path(job.output_path)
     settings = job.settings
+    if job.prompt_for_telemetry:
+        settings.telemetry_prompt = _raise_telemetry_prompt_required
 
     if not input_path.is_dir():
         raise SystemExit(f"Input path '{input_path}' is not a directory.")
@@ -522,6 +529,13 @@ def _normalize_selected_timestamps(selected_timestamps: tuple[str, ...] | None) 
         normalized.append(timestamp)
         seen.add(timestamp)
     return tuple(normalized)
+
+
+def _raise_telemetry_prompt_required() -> bool:
+    raise TelemetryPromptRequired(
+        "Telemetry data is incomplete or unavailable for one or more selected clips.\n\n"
+        "Continue rendering without the telemetry overlay?"
+    )
 
 
 def _output_filename(first_timestamp: str, settings: RenderSettings) -> str:

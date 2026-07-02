@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from modules import layouts
@@ -10,3 +11,4 @@ class RenderSettings:
     preview: bool
     keep_csv: bool
     layout: layouts.LayoutConfig
+    telemetry_prompt: Callable[[], bool] | None = None
