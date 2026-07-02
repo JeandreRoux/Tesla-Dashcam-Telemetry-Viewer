@@ -333,18 +333,18 @@ def create_main_window(qt: dict[str, object]):
             paths_layout = QGridLayout(paths_group)
             self.input_edit = QLineEdit()
             self.input_edit.setPlaceholderText("Add the folder with your TeslaCam videos")
-            input_browse = QPushButton("Browse…")
-            input_browse.clicked.connect(self._choose_input)
+            self.input_browse_button = QPushButton("Browse…")
+            self.input_browse_button.clicked.connect(self._choose_input)
             self.output_edit = QLineEdit()
             self.output_edit.setPlaceholderText("Choose where to save the finished video")
-            output_browse = QPushButton("Browse…")
-            output_browse.clicked.connect(self._choose_output)
+            self.output_browse_button = QPushButton("Browse…")
+            self.output_browse_button.clicked.connect(self._choose_output)
             paths_layout.addWidget(QLabel("Input folder"), 0, 0)
             paths_layout.addWidget(self.input_edit, 0, 1)
-            paths_layout.addWidget(input_browse, 0, 2)
+            paths_layout.addWidget(self.input_browse_button, 0, 2)
             paths_layout.addWidget(QLabel("Output folder"), 1, 0)
             paths_layout.addWidget(self.output_edit, 1, 1)
-            paths_layout.addWidget(output_browse, 1, 2)
+            paths_layout.addWidget(self.output_browse_button, 1, 2)
             main_layout.addWidget(paths_group)
 
             layout_group = QGroupBox("Layout preview")
@@ -503,6 +503,9 @@ def create_main_window(qt: dict[str, object]):
         def _set_selected_timestamps(self, timestamps: tuple[str, ...]):
             self._selected_timestamps = timestamps
             self._update_clip_summary()
+            if self._thread is None:
+                self.progress.setRange(0, 100)
+                self.progress.setValue(0)
             if self._last_scan and self._last_scan.is_ready and self._mp4_output_supported:
                 if self._selected_timestamps:
                     self.status_label.setText("Ready to render.")
@@ -519,7 +522,6 @@ def create_main_window(qt: dict[str, object]):
                 self.clip_summary_label.setText(f"Clips selected: all {total}")
             else:
                 self.clip_summary_label.setText(f"Clips selected: {selected} of {total}")
-            self.customize_clips_button.setEnabled(bool(self._last_scan and self._last_scan.is_ready))
 
         def _customize_clips(self):
             if not self._last_scan or not self._last_scan.is_ready:
@@ -582,6 +584,11 @@ def create_main_window(qt: dict[str, object]):
                 and has_output
                 and not busy
                 and has_selected_clip
+            )
+            self.input_browse_button.setEnabled(not busy)
+            self.output_browse_button.setEnabled(not busy)
+            self.customize_clips_button.setEnabled(
+                bool(self._last_scan and self._last_scan.is_ready) and not busy
             )
 
         def _show_codec_warning_if_needed(self):

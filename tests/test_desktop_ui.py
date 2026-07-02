@@ -77,9 +77,28 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertEqual(window.status_label.text(), "Ready to render.")
         self.assertEqual(window.progress.value(), 0)
         self.assertTrue(window.render_button.isEnabled())
+        self.assertTrue(window.input_browse_button.isEnabled())
+        self.assertTrue(window.output_browse_button.isEnabled())
 
+        window._thread = object()
+        window._sync_buttons()
+
+        self.assertFalse(window.render_button.isEnabled())
+        self.assertFalse(window.customize_clips_button.isEnabled())
+        self.assertFalse(window.input_browse_button.isEnabled())
+        self.assertFalse(window.output_browse_button.isEnabled())
+
+        window._thread = None
+        window._sync_buttons()
+
+        self.assertTrue(window.customize_clips_button.isEnabled())
+        self.assertTrue(window.input_browse_button.isEnabled())
+        self.assertTrue(window.output_browse_button.isEnabled())
+
+        window.progress.setValue(100)
         window._set_selected_timestamps(("2026-06-19_23-09-01",))
 
+        self.assertEqual(window.progress.value(), 0)
         self.assertEqual(window.clip_summary_label.text(), "Clips selected: 1 of 2")
         self.assertTrue(window.render_button.isEnabled())
 
