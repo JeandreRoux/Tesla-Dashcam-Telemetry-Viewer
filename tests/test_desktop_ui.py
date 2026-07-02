@@ -230,7 +230,8 @@ class TestDesktopUiLayoutState(unittest.TestCase):
         self.assertEqual(render_calls, ["render"])
         self.assertEqual(len(prompts), 1)
         self.assertEqual(prompts[0].title, "Incomplete telemetry data")
-        self.assertIn("Park", prompts[0].informative_text)
+        self.assertEqual(prompts[0].informative_text, "")
+        self.assertIn("Park", prompts[0].detailed_text)
         self.assertIn("without the telemetry overlay", prompts[0].detailed_text)
         self.assertIn("Continuing without telemetry overlay.", window.log_panel.toPlainText())
 

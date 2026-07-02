@@ -770,11 +770,9 @@ def create_main_window(qt: dict[str, object]):
             dialog.setIcon(QMessageBox.Icon.Warning)
             dialog.setWindowTitle("Incomplete telemetry data")
             dialog.setText(message)
-            dialog.setInformativeText(
-                "Common causes include the car being in Park for part of the clip, "
-                "missing or partial telemetry CSV data, or telemetry that cannot be matched to every video frame."
-            )
             dialog.setDetailedText(
+                "Common causes include the car being in Park for part of the clip, "
+                "missing or partial telemetry CSV data, or telemetry that cannot be matched to every video frame.\n\n"
                 "TeslaCam Telemetry can still render the selected clip without the telemetry overlay.\n\n"
                 "Choose Yes to render the video without telemetry. Choose No to cancel and leave your settings unchanged."
             )
